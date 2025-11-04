@@ -1,0 +1,5 @@
+add_subdirectory("anemometer")
+add_subdirectory("rain_gauge")
+add_subdirectory("wind_vane")
+add_subdirectory("wind")
+add_subdirectory("mqtt")
