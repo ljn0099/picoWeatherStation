@@ -1,0 +1,12 @@
+[submodule "pico-ltr390"]
+	path = pico-ltr390
+	url = https://github.com/ljn0099/pico-ltr390
+[submodule "pico-hdc3022"]
+	path = pico-hdc3022
+	url = https://github.com/ljn0099/pico-hdc3022
+[submodule "pico-dps310"]
+	path = pico-dps310
+	url = https://github.com/ljn0099/pico-dps310
+[submodule "pico-pcf8523"]
+	path = pico-pcf8523
+	url = https://github.com/ljn0099/pico-pcf8523

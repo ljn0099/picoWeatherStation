@@ -9,6 +9,10 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 add_subdirectory("demos")
+add_subdirectory("pico-ltr390/src")
+add_subdirectory("pico-hdc3022/src")
+add_subdirectory("pico-dps310/src")
+add_subdirectory("pico-pcf8523/src")
 # add_subdirectory("src")
 
 # target_include_directories(PRIVATE ${CMAKE_CURRENT_LIST_DIR} )
