@@ -65,6 +65,11 @@ int main() {
     if (!dps310_correct_temp(&dps310))
         return -1;
 
+    if (!dps310_set_pres_oversampling(&dps310, DPS310_OVERSAMPLING_16_TIMES))
+        return -1;
+    if (!dps310_set_temp_oversampling(&dps310, DPS310_OVERSAMPLING_1_TIME))
+        return -1;
+
     if (!dps310_set_meas_mode(&dps310, DPS310_MODE_CONT_PRES_TEMP_MEAS))
         return -1;
 
