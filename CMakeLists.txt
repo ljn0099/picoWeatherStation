@@ -13,7 +13,7 @@ add_subdirectory("pico-ltr390/src")
 add_subdirectory("pico-hdc3022/src")
 add_subdirectory("pico-dps310/src")
 add_subdirectory("pico-pcf8523/src")
-# add_subdirectory("src")
+add_subdirectory("src")
 
 # target_include_directories(PRIVATE ${CMAKE_CURRENT_LIST_DIR} )
 # target_link_libraries(pico_cyw43_arch_lwip_threadsafe_background pico_stdlib)
