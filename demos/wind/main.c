@@ -97,7 +97,6 @@ void anemometer_meas() {
     printf("Average wind speed: %f\n", anemometerData.averageSpeed);
     printf("Peak wind speed: %f\n", anemometerData.peakSpeed);
     printf("Peak wind direction: %f\n", windVaneData.peakDir);
-    printf("\n");
 
     anemometerData.interrupts = 0;
     anemometerData.peakInterrupts = 0;
@@ -108,7 +107,7 @@ float wind_average_update() {
     float dir = get_wind_direction(adcRaw);
     if (dir < 0.0f)
         return -1.0f;
-    printf("Updated to: %.2f\n", RAD_TO_DEG(dir));
+    // printf("Updated to: %.2f\n", RAD_TO_DEG(dir));
 
     windVaneData.sumX += cosf(dir);
     windVaneData.sumY += sinf(dir);

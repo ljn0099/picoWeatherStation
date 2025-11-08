@@ -96,6 +96,8 @@ void wind_average_update(uint16_t adcRaw) {
     if (dir < 0.0f)
         return;
 
+    printf("Direction: %.2f\n", RAD_TO_DEG(dir));
+
     windVaneData.sumX += cosf(dir);
     windVaneData.sumY += sinf(dir);
     windVaneData.count++;
@@ -159,7 +161,7 @@ int main() {
         // uint16_t adcRaw = read_adc_windVaneData(6);
         // float direction = get_wind_direction(adcRaw);
 
-        // printf("Voltage: %f V, direction: %fº\n", ADC_TO_VOLT(adcRaw), direction);
+        // printf("Voltage: %f V, direction: %.2fº\n", ADC_TO_VOLT(adcRaw), RAD_TO_DEG(direction));
         // sleep_ms(500);
 
         tight_loop_contents();
