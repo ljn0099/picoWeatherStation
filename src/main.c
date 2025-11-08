@@ -67,31 +67,44 @@
 #endif
 
 typedef struct {
+    float value;
+    bool valid;
+} finalData_t;
+
+typedef struct {
     float sum;
     uint32_t count;
-    float average;
-    bool valid;
 } avgData_t;
 
 typedef struct {
     float sumXRad;
     float sumYRad;
     uint32_t count;
-    float avgDirDeg;
-    bool valid;
 } circAvgData_t;
 
 typedef struct {
     volatile uint32_t interrupts;
-    float value;
 } interruptSensor_t;
 
 typedef struct {
     volatile uint32_t interrupts;
     volatile uint32_t peakInterrupts;
-
-    float peakValue;
 } peakInterruptSensor_t;
+
+typedef struct {
+    interruptSensor_t rainfall;
+    interruptSensor_t windSpeed;
+    peakInterruptSensor_t peakWindSpeed;
+    circAvgData_t windDirection;
+} weatherInternal_t;
+
+typedef struct {
+    finalData_t rainfallMM;
+    finalData_t windSpeedKmH;
+    finalData_t peakWindSpeedKmH;
+    finalData_t windDirectionDeg;
+    finalData_t peakWindDirectionDeg;
+} weatherData_t;
 
 typedef struct {
     uint16_t adcValue;
@@ -117,15 +130,15 @@ const windVaneCalibration_t windVaneCalibrations[] = {
     {VOLT_TO_ADC(0.584f), DEG_TO_RAD(337.5f)}  // NNW
 };
 
-float get_wind_speed_kmh(uint32_t interruptions, float timeSec) {
+static inline float get_wind_speed_kmh(uint32_t interruptions, float timeSec) {
     return ANEMOMETER_FACTOR * ((float)interruptions / timeSec);
 }
 
-float get_rain_mm(uint32_t interrupts) {
+static inline float get_rain_mm(uint32_t interrupts) {
     return PLUVIOMETER_FACTOR * interrupts;
 }
 
-float get_wind_direction_rad(uint16_t adcValue) {
+static inline float get_wind_direction_rad(uint16_t adcValue) {
     for (size_t i = 0; i < ARRAY_LEN(windVaneCalibrations); i++) {
         int diff = (int)adcValue - (int)windVaneCalibrations[i].adcValue;
 
@@ -138,36 +151,35 @@ float get_wind_direction_rad(uint16_t adcValue) {
     return -1.0f;
 }
 
-void avg_data_update(avgData_t *avgData, float value) {
+static inline void avg_data_update(avgData_t *avgData, float value) {
     avgData->sum += value;
     avgData->count++;
 }
 
-void avg_data_compute(avgData_t *avgData) {
+static inline void avg_data_compute(avgData_t *avgData, finalData_t *finalData) {
     if (avgData->count == 0) {
-        avgData->valid = false;
+        finalData->valid = false;
         return;
     }
 
-    avgData->average = avgData->sum / avgData->count;
-    avgData->valid = true;
+    finalData->value = avgData->sum / avgData->count;
+    finalData->valid = true;
 }
 
-void avg_data_reset(avgData_t *avgData) {
+static inline void avg_data_reset(avgData_t *avgData) {
     avgData->sum = 0.0f;
     avgData->count = 0;
-    avgData->valid = false;
 }
 
-void circ_avg_data_update(circAvgData_t *circAvgData, float dirRad) {
+static inline void circ_avg_data_update(circAvgData_t *circAvgData, float dirRad) {
     circAvgData->sumXRad += cosf(dirRad);
     circAvgData->sumYRad += sinf(dirRad);
     circAvgData->count++;
 }
 
-void circ_avg_data_compute(circAvgData_t *circAvgData) {
+void circ_avg_data_compute(circAvgData_t *circAvgData, finalData_t *finalData) {
     if (circAvgData->count == 0) {
-        circAvgData->valid = false;
+        finalData->valid = false;
         return;
     }
 
@@ -177,41 +189,43 @@ void circ_avg_data_compute(circAvgData_t *circAvgData) {
     float avgDirDeg = RAD_TO_DEG(atan2f(meanYRad, meanXRad));
     avgDirDeg = fmodf(avgDirDeg + 360.0f, 360.0f);
 
-    circAvgData->avgDirDeg = avgDirDeg;
-    circAvgData->valid = true;
+    finalData->value = avgDirDeg;
+    finalData->valid = true;
 }
 
-void circ_avg_data_reset(circAvgData_t *circAvgData) {
+static inline void circ_avg_data_reset(circAvgData_t *circAvgData) {
     circAvgData->sumYRad = 0.0f;
     circAvgData->sumXRad = 0.0f;
     circAvgData->count = 0;
-    circAvgData->valid = false;
 }
 
-void rain_gauge_compute(interruptSensor_t *rainData) {
-    rainData->value = get_rain_mm(rainData->interrupts);
+static inline void rain_gauge_compute(interruptSensor_t *rainData, finalData_t *finalData) {
+    finalData->value = get_rain_mm(rainData->interrupts);
+    finalData->valid = true;
 }
 
-void wind_speed_compute(interruptSensor_t *speedData) {
-    speedData->value = get_wind_speed_kmh(speedData->interrupts, COMPUTE_INTERVAL_S);
+static inline void wind_speed_compute(interruptSensor_t *speedData, finalData_t *finalData) {
+    finalData->value = get_wind_speed_kmh(speedData->interrupts, COMPUTE_INTERVAL_S);
+    finalData->valid = true;
 }
 
-void interrupt_data_reset(interruptSensor_t *intData) {
+static inline void interrupt_data_reset(interruptSensor_t *intData) {
     intData->interrupts = 0;
 }
 
-void peak_wind_speed_compute(peakInterruptSensor_t *peakSpeedData) {
-    peakSpeedData->peakValue = get_wind_speed_kmh(peakSpeedData->peakInterrupts, SAMPLE_INTERVAL_S);
+static inline void peak_wind_speed_compute(peakInterruptSensor_t *peakSpeedData, finalData_t *finalData) {
+    finalData->value = get_wind_speed_kmh(peakSpeedData->peakInterrupts, SAMPLE_INTERVAL_S);
+    finalData->valid = true;
 }
 
-void peak_interrupt_data_update(peakInterruptSensor_t *intData) {
+static inline void peak_interrupt_data_update(peakInterruptSensor_t *intData) {
     if (intData->interrupts > intData->peakInterrupts) {
         intData->peakInterrupts = intData->interrupts;
     }
     intData->interrupts = 0;
 }
 
-void peak_interrupt_data_reset(peakInterruptSensor_t *intData) {
+static inline void peak_interrupt_data_reset(peakInterruptSensor_t *intData) {
     intData->interrupts = 0;
     intData->peakInterrupts = 0;
 }
@@ -228,6 +242,10 @@ void wind_direction_update(circAvgData_t *directionData) {
     circ_avg_data_update(directionData, dirRad);
 }
 
+static inline void final_data_reset(finalData_t *finalData) {
+    finalData->valid = false;
+}
+
 // Wind speed and rainfall don't need to be sampled in the callback because they
 // are sampled in the IRQ
 typedef enum {
@@ -238,6 +256,7 @@ typedef enum {
     SAMPLE_UV = (1 << 3),
     SAMPLE_PEAK_WIND_SPEED = (1 << 4),
     SAMPLE_WIND_DIRECTION = (1 << 5),
+    SAMPLE_PEAK_WIND_DIRECTION = (1 << 6)
 } sampleFlags_t;
 
 typedef enum {
@@ -249,7 +268,7 @@ typedef enum {
     COMPUTE_WIND_SPEED = (1 << 5),
     COMPUTE_PEAK_WIND_SPEED = (1 << 6),
     COMPUTE_WIND_DIRECTION = (1 << 7),
-    COMPUTE_RAINFALL = (1 << 8),
+    COMPUTE_RAINFALL = (1 << 8)
 } computeFlags_t;
 
 uint32_t sampleFlags = 0;
@@ -258,6 +277,7 @@ uint32_t computeFlags = 0;
 bool sample_callback(__unused struct repeating_timer *t) {
     sampleFlags |= SAMPLE_PEAK_WIND_SPEED;
     sampleFlags |= SAMPLE_WIND_DIRECTION;
+    sampleFlags |= SAMPLE_PEAK_WIND_DIRECTION;
     return true;
 }
 
@@ -270,19 +290,17 @@ bool compute_callback(__unused struct repeating_timer *t) {
     return true;
 }
 
-interruptSensor_t rainGaugeData = {0};
-interruptSensor_t windSpeedData = {0};
-peakInterruptSensor_t peakWindSpeedData = {0};
-circAvgData_t windDirectionData = {0};
+weatherData_t weatherData = {0};
+weatherInternal_t weatherInternal = {0};
 
 void gpio_callback(uint gpio, uint32_t events) {
     if (gpio == RAIN_GAUGE_PIN) {
-        rainGaugeData.interrupts++;
-        DEBUG_printf("Interrupt %ld on rain gauge\n", rainGaugeData.interrupts);
+        weatherInternal.rainfall.interrupts++;
+        DEBUG_printf("Interrupt %ld on rain gauge\n", weatherInternal.rainfall.interrupts);
     }
     else if (gpio == ANEMOMETER_PIN) {
-        windSpeedData.interrupts++;
-        peakWindSpeedData.interrupts++;
+        weatherInternal.windSpeed.interrupts++;
+        weatherInternal.peakWindSpeed.interrupts++;
         // DEBUG_printf("Interrupt %ld on anemometer\n", windSpeedData.interrupts);
     }
 }
@@ -338,12 +356,12 @@ void process_sample_flags() {
     if (sampleFlags & SAMPLE_PEAK_WIND_SPEED) {
         sampleFlags &= ~SAMPLE_PEAK_WIND_SPEED;
 
-        peak_interrupt_data_update(&peakWindSpeedData);
+        peak_interrupt_data_update(&weatherInternal.peakWindSpeed);
     }
     if (sampleFlags & SAMPLE_WIND_DIRECTION) {
         sampleFlags &= ~SAMPLE_WIND_DIRECTION;
 
-        wind_direction_update(&windDirectionData);
+        wind_direction_update(&weatherInternal.windDirection);
     }
 }
 
@@ -351,33 +369,33 @@ void process_compute_flags() {
     if (computeFlags & COMPUTE_RAINFALL) {
         computeFlags &= ~COMPUTE_RAINFALL;
 
-        rain_gauge_compute(&rainGaugeData);
-        interrupt_data_reset(&rainGaugeData);
+        rain_gauge_compute(&weatherInternal.rainfall, &weatherData.rainfallMM);
+        interrupt_data_reset(&weatherInternal.rainfall);
 
-        DEBUG_printf("Rainfall: %f mm\n", rainGaugeData.value);
+        DEBUG_printf("Rainfall: %f mm\n", weatherData.rainfallMM.value);
     }
     if (computeFlags & COMPUTE_WIND_SPEED) {
         computeFlags &= ~COMPUTE_WIND_SPEED;
 
-        wind_speed_compute(&windSpeedData);
-        interrupt_data_reset(&windSpeedData);
+        wind_speed_compute(&weatherInternal.windSpeed, &weatherData.windSpeedKmH);
+        interrupt_data_reset(&weatherInternal.windSpeed);
 
-        DEBUG_printf("Average wind speed: %f km/h\n", windSpeedData.value);
+        DEBUG_printf("Average wind speed: %f km/h\n", weatherData.windSpeedKmH.value);
     }
     if (computeFlags & COMPUTE_PEAK_WIND_SPEED) {
         computeFlags &= ~COMPUTE_PEAK_WIND_SPEED;
 
-        peak_wind_speed_compute(&peakWindSpeedData);
-        peak_interrupt_data_reset(&peakWindSpeedData);
+        peak_wind_speed_compute(&weatherInternal.peakWindSpeed, &weatherData.peakWindSpeedKmH);
+        peak_interrupt_data_reset(&weatherInternal.peakWindSpeed);
 
-        DEBUG_printf("Peak wind speed: %f km/h\n", peakWindSpeedData.peakValue);
+        DEBUG_printf("Peak wind speed: %f km/h\n", weatherData.peakWindSpeedKmH.value);
     }
     if (computeFlags & COMPUTE_WIND_DIRECTION) {
         computeFlags &= ~COMPUTE_WIND_DIRECTION;
 
-        circ_avg_data_compute(&windDirectionData);
-        circ_avg_data_reset(&windDirectionData);
+        circ_avg_data_compute(&weatherInternal.windDirection, &weatherData.windDirectionDeg);
+        circ_avg_data_reset(&weatherInternal.windDirection);
 
-        DEBUG_printf("Average wind direction: %.2fº\n", windDirectionData.avgDirDeg);
+        DEBUG_printf("Average wind direction: %.2fº\n", weatherData.windDirectionDeg.value);
     }
 }
