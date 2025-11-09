@@ -570,7 +570,6 @@ int main(void) {
     return 0;
 }
 
-// NOTE: SAMPLE_WIND_DIRECTION should always be procesed before SAMPLE_PEAK_WIND
 void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *weatherSensor) {
     sampleCmd_t cmd;
     while (queue_try_remove(&weatherSampleQueue, &cmd)) {
@@ -595,7 +594,7 @@ void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *wea
         case SAMPLE_LTR390:
             ltr390_sample(&weatherSensor->ltr390, &weatherAverage->lux, &weatherAverage->uvi);
             break;
-        } // End switch
+        }
     }
 }
 
