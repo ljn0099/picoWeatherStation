@@ -3,6 +3,7 @@
 #include "hardware/i2c.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
+#include "pico/util/queue.h"
 
 #include "sensor/dps310.h"
 #include "sensor/hdc3022.h"
@@ -59,6 +60,10 @@
 #define WIND_VANE_TOLERANCE_V 0.05f
 #define WIND_VANE_TOLERANCE_ADC (VOLT_TO_ADC(WIND_VANE_TOLERANCE_V))
 
+#define WEATHER_FINAL_QUEUE_SIZE 5
+#define WEATHER_COMPUTE_QUEUE_SIZE 16
+#define WEATHER_SAMPLE_QUEUE_SIZE 16
+
 // Utils
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -84,6 +89,10 @@
 #ifndef ERROR_printf
 #define ERROR_printf printf
 #endif
+
+#define COMPUTE_QUEUE_ADD_CMD(cmd) queue_try_add(&weatherComputeQueue, &(computeCmd_t){cmd})
+
+#define SAMPLE_QUEUE_ADD_CMD(cmd) queue_try_add(&weatherSampleQueue, &(sampleCmd_t){cmd})
 
 typedef struct {
     float value;
@@ -297,50 +306,55 @@ static inline void avg_data_compute(avgData_t *avgData, finalData_t *finalData) 
 // Wind speed and rainfall don't need to be sampled in the callback because they
 // are sampled in the IRQ
 typedef enum {
-    SAMPLE_HDC3022 = (1 << 0),
-    SAMPLE_DPS310 = (1 << 1),
-    SAMPLE_LTR390 = (1 << 2),
-    SAMPLE_PEAK_WIND = (1 << 3),
-    SAMPLE_WIND_DIRECTION = (1 << 4),
-    SAMPLE_PEAK_WIND_DIRECTION = (1 << 5)
-} sampleFlags_t;
+    SAMPLE_HDC3022,
+    SAMPLE_DPS310,
+    SAMPLE_LTR390,
+    SAMPLE_PEAK_WIND,
+    SAMPLE_WIND_DIRECTION,
+    SAMPLE_PEAK_WIND_DIRECTION
+} sampleCmd_t;
 
 typedef enum {
-    COMPUTE_TEMP = (1 << 0),
-    COMPUTE_HUMIDITY = (1 << 1),
-    COMPUTE_PRES = (1 << 2),
-    COMPUTE_LUX = (1 << 3),
-    COMPUTE_UVI = (1 << 4),
-    COMPUTE_WIND_SPEED = (1 << 5),
-    COMPUTE_PEAK_WIND = (1 << 6),
-    COMPUTE_WIND_DIRECTION = (1 << 7),
-    COMPUTE_RAINFALL = (1 << 8)
-} computeFlags_t;
+    COMPUTE_TEMP,
+    COMPUTE_HUMIDITY,
+    COMPUTE_PRES,
+    COMPUTE_LUX,
+    COMPUTE_UVI,
+    COMPUTE_WIND_SPEED,
+    COMPUTE_PEAK_WIND,
+    COMPUTE_WIND_DIRECTION,
+    COMPUTE_RAINFALL,
+    COMPUTE_SEND_DATA
+} computeCmd_t;
 
-uint32_t sampleFlags = 0;
-uint32_t computeFlags = 0;
+queue_t weatherFinalQueue;
+queue_t weatherComputeQueue;
+queue_t weatherSampleQueue;
 
 // NOTE: SAMPLE_WIND_DIRECTION should always be procesed before SAMPLE_PEAK_WIND
 bool sample_callback(__unused struct repeating_timer *t) {
-    sampleFlags |= SAMPLE_WIND_DIRECTION;
-    sampleFlags |= SAMPLE_PEAK_WIND;
-    sampleFlags |= SAMPLE_HDC3022;
-    sampleFlags |= SAMPLE_DPS310;
-    sampleFlags |= SAMPLE_LTR390;
+    SAMPLE_QUEUE_ADD_CMD(SAMPLE_WIND_DIRECTION);
+    SAMPLE_QUEUE_ADD_CMD(SAMPLE_PEAK_WIND);
+    SAMPLE_QUEUE_ADD_CMD(SAMPLE_HDC3022);
+    SAMPLE_QUEUE_ADD_CMD(SAMPLE_DPS310);
+    SAMPLE_QUEUE_ADD_CMD(SAMPLE_LTR390);
     return true;
 }
 
 bool compute_callback(__unused struct repeating_timer *t) {
     DEBUG_printf("\n"); // Separate meas intervals with \n
-    computeFlags |= COMPUTE_RAINFALL;
-    computeFlags |= COMPUTE_WIND_DIRECTION;
-    computeFlags |= COMPUTE_WIND_SPEED;
-    computeFlags |= COMPUTE_PEAK_WIND;
-    computeFlags |= COMPUTE_TEMP;
-    computeFlags |= COMPUTE_HUMIDITY;
-    computeFlags |= COMPUTE_PRES;
-    computeFlags |= COMPUTE_LUX;
-    computeFlags |= COMPUTE_UVI;
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_RAINFALL);
+
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_WIND_DIRECTION);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_WIND_SPEED);
+
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_PEAK_WIND);
+
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_TEMP);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_HUMIDITY);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_PRES);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_LUX);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_UVI);
     return true;
 }
 
@@ -356,8 +370,8 @@ void gpio_callback(uint gpio, uint32_t events) {
     }
 }
 
-void process_sample_flags();
-void process_compute_flags();
+void process_sample_queue();
+void process_compute_queue();
 
 bool hdc3022_init(hdc3022_t *hdc3022) {
     if (!hdc3022_init_struct(hdc3022, I2C_BUS, HDC3022_DEFAULT_ADDR, HDC3022_AUTO_MEAS_NONE,
@@ -486,6 +500,11 @@ int main(void) {
     gpio_set_irq_enabled_with_callback(RAIN_GAUGE_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
     gpio_set_irq_enabled(ANEMOMETER_PIN, GPIO_IRQ_EDGE_RISE, true);
 
+    // Queue
+    queue_init(&weatherFinalQueue, sizeof(weatherFinal_t), WEATHER_FINAL_QUEUE_SIZE);
+    queue_init(&weatherComputeQueue, sizeof(computeCmd_t), WEATHER_COMPUTE_QUEUE_SIZE);
+    queue_init(&weatherSampleQueue, sizeof(sampleCmd_t), WEATHER_SAMPLE_QUEUE_SIZE);
+
     // Timers
     struct repeating_timer computeTimer;
     if (!add_repeating_timer_ms(-COMPUTE_INTERVAL_MS, compute_callback, NULL, &computeTimer)) {
@@ -498,8 +517,8 @@ int main(void) {
 
     // Main loop
     while (1) {
-        process_sample_flags(&weatherAverage, &weatherSensor);
-        process_compute_flags(&weatherAverage, &weatherFinal);
+        process_sample_queue(&weatherAverage, &weatherSensor);
+        process_compute_queue(&weatherAverage, &weatherFinal);
         // watchdog_update();
     }
 
@@ -507,116 +526,117 @@ int main(void) {
 }
 
 // NOTE: SAMPLE_WIND_DIRECTION should always be procesed before SAMPLE_PEAK_WIND
-void process_sample_flags(weatherAverage_t *weatherAverage, weatherSensor_t *weatherSensor) {
-    if (sampleFlags & SAMPLE_WIND_DIRECTION) {
-        sampleFlags &= ~SAMPLE_WIND_DIRECTION;
+void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *weatherSensor) {
+    sampleCmd_t cmd;
+    while (queue_try_remove(&weatherSampleQueue, &cmd)) {
+        switch (cmd) {
+        case SAMPLE_WIND_DIRECTION:
+            wind_direction_update(&weatherAverage->windDirection);
+            break;
 
-        wind_direction_update(&weatherAverage->windDirection);
-    }
-    if (sampleFlags & SAMPLE_PEAK_WIND) {
-        sampleFlags &= ~SAMPLE_PEAK_WIND;
+        case SAMPLE_PEAK_WIND:
+            peak_wind_update(&weatherAverage->windDirection);
+            break;
 
-        peak_wind_update(&weatherAverage->windDirection);
-    }
-    if (sampleFlags & SAMPLE_HDC3022) {
-        sampleFlags &= ~SAMPLE_HDC3022;
-        float temp, humidity;
-        if (!hdc3022_readout_auto_meas(&weatherSensor->hdc3022, HDC3022_AUTO_MEAS_READOUT,
-                                       HDC3022_TEMP_CELSIUS, &temp, &humidity)) {
-            ERROR_printf("Error doing the HDC3022 readout\n");
-            return;
+        case SAMPLE_HDC3022: {
+            float temp, humidity;
+            if (!hdc3022_readout_auto_meas(&weatherSensor->hdc3022, HDC3022_AUTO_MEAS_READOUT,
+                                           HDC3022_TEMP_CELSIUS, &temp, &humidity)) {
+                ERROR_printf("Error doing the HDC3022 readout\n");
+                break;
+            }
+            avg_data_update(&weatherAverage->temperature, temp);
+            avg_data_update(&weatherAverage->humidity, humidity);
+            break;
         }
-        avg_data_update(&weatherAverage->temperature, temp);
-        avg_data_update(&weatherAverage->humidity, humidity);
-    }
 
-    if (sampleFlags & SAMPLE_DPS310) {
-        sampleFlags &= ~SAMPLE_DPS310;
-
-        float pres;
-        if (!dps310_read_pres(&weatherSensor->dps310, &pres, true)) {
-            ERROR_printf("Error doing the DPS310 readout\n");
-            return;
+        case SAMPLE_DPS310: {
+            float pres;
+            if (!dps310_read_pres(&weatherSensor->dps310, &pres, true)) {
+                ERROR_printf("Error doing the DPS310 readout\n");
+                break;
+            }
+            pres = PA_TO_HPA(pres);
+            avg_data_update(&weatherAverage->pressure, pres);
+            break;
         }
-        pres = PA_TO_HPA(pres);
-        avg_data_update(&weatherAverage->pressure, pres);
-    }
-    if (sampleFlags & SAMPLE_LTR390) {
-        sampleFlags &= ~SAMPLE_LTR390;
 
-        float lux, uvi;
+        case SAMPLE_LTR390: {
+            float lux, uvi;
+            if (!ltr390_set_mode(&weatherSensor->ltr390, LTR390_ALS_MODE))
+                break;
+            sleep_ms(LTR390_INT_TIME_MS);
+            if (!ltr390_read_lux(&weatherSensor->ltr390, &lux))
+                break;
 
-        if (!ltr390_set_mode(&weatherSensor->ltr390, LTR390_ALS_MODE))
-            return;
-        sleep_ms(LTR390_INT_TIME_MS);
-        if (!ltr390_read_lux(&weatherSensor->ltr390, &lux))
-            return;
+            if (!ltr390_set_mode(&weatherSensor->ltr390, LTR390_UVS_MODE))
+                break;
+            sleep_ms(LTR390_INT_TIME_MS);
+            if (!ltr390_read_uvi(&weatherSensor->ltr390, &uvi))
+                break;
 
-        if (!ltr390_set_mode(&weatherSensor->ltr390, LTR390_UVS_MODE))
-            return;
-        sleep_ms(LTR390_INT_TIME_MS);
-        if (!ltr390_read_uvi(&weatherSensor->ltr390, &uvi))
-            return;
-
-        avg_data_update(&weatherAverage->lux, lux);
-        avg_data_update(&weatherAverage->uvi, uvi);
+            avg_data_update(&weatherAverage->lux, lux);
+            avg_data_update(&weatherAverage->uvi, uvi);
+            break;
+        }
+        } // End switch
     }
 }
 
-void process_compute_flags(weatherAverage_t *weatherAverage, weatherFinal_t *weatherFinal) {
-    if (computeFlags & COMPUTE_RAINFALL) {
-        computeFlags &= ~COMPUTE_RAINFALL;
+void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *weatherFinal) {
+    computeCmd_t cmd;
+    while (queue_try_remove(&weatherComputeQueue, &cmd)) {
+        switch (cmd) {
+        case COMPUTE_RAINFALL:
+            rain_gauge_compute(&weatherFinal->rainfallMM);
+            DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal->rainfallMM.value);
+            break;
 
-        rain_gauge_compute(&weatherFinal->rainfallMM);
-        DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal->rainfallMM.value);
-    }
-    if (computeFlags & COMPUTE_WIND_SPEED) {
-        computeFlags &= ~COMPUTE_WIND_SPEED;
+        case COMPUTE_WIND_SPEED:
+            wind_speed_average_compute(&weatherFinal->windSpeedKmH);
+            DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal->windSpeedKmH.value);
+            break;
 
-        wind_speed_average_compute(&weatherFinal->windSpeedKmH);
-        DEBUG_printf("Average wind speed: %.2fº\n", weatherFinal->windSpeedKmH.value);
-    }
-    if (computeFlags & COMPUTE_WIND_DIRECTION) {
-        computeFlags &= ~COMPUTE_WIND_DIRECTION;
+        case COMPUTE_WIND_DIRECTION:
+            wind_direction_compute(&weatherAverage->windDirection, &weatherFinal->windDirectionDeg);
+            DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal->windDirectionDeg.value);
+            break;
 
-        wind_direction_compute(&weatherAverage->windDirection, &weatherFinal->windDirectionDeg);
-        DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal->windDirectionDeg.value);
-    }
-    if (computeFlags & COMPUTE_PEAK_WIND) {
-        computeFlags &= ~COMPUTE_PEAK_WIND;
+        case COMPUTE_PEAK_WIND:
+            peak_wind_compute(&weatherFinal->peakWindSpeedKmH, &weatherFinal->peakWindDirectionDeg);
+            DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal->peakWindSpeedKmH.value);
+            DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal->peakWindDirectionDeg.value);
+            break;
 
-        peak_wind_compute(&weatherFinal->peakWindSpeedKmH, &weatherFinal->peakWindDirectionDeg);
-        DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal->peakWindSpeedKmH.value);
-        DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal->peakWindDirectionDeg.value);
-    }
-    if (computeFlags & COMPUTE_TEMP) {
-        computeFlags &= ~COMPUTE_TEMP;
+        case COMPUTE_TEMP:
+            avg_data_compute(&weatherAverage->temperature, &weatherFinal->temperatureCelsius);
+            DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal->temperatureCelsius.value);
+            break;
 
-        avg_data_compute(&weatherAverage->temperature, &weatherFinal->temperatureCelsius);
-        DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal->temperatureCelsius.value);
-    }
-    if (computeFlags & COMPUTE_HUMIDITY) {
-        computeFlags &= ~COMPUTE_HUMIDITY;
+        case COMPUTE_HUMIDITY:
+            avg_data_compute(&weatherAverage->humidity, &weatherFinal->humidityRh);
+            DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal->humidityRh.value);
+            break;
 
-        avg_data_compute(&weatherAverage->humidity, &weatherFinal->humidityRh);
-        DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal->humidityRh.value);
-    }
-    if (computeFlags & COMPUTE_PRES) {
-        computeFlags &= ~COMPUTE_PRES;
+        case COMPUTE_PRES:
+            avg_data_compute(&weatherAverage->pressure, &weatherFinal->pressureHPA);
+            DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal->pressureHPA.value);
+            break;
 
-        avg_data_compute(&weatherAverage->pressure, &weatherFinal->pressureHPA);
-        DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal->pressureHPA.value);
-    }
-    if (computeFlags & COMPUTE_LUX) {
-        computeFlags &= ~COMPUTE_LUX;
+        case COMPUTE_LUX:
+            avg_data_compute(&weatherAverage->lux, &weatherFinal->lux);
+            DEBUG_printf("Lux: %.2f\n", weatherFinal->lux.value);
+            break;
 
-        avg_data_compute(&weatherAverage->lux, &weatherFinal->lux);
-        DEBUG_printf("Lux: %.2f\n", weatherFinal->lux.value);
-    }
-    if (computeFlags & COMPUTE_UVI) {
-        computeFlags &= ~COMPUTE_UVI;
+        case COMPUTE_UVI:
+            avg_data_compute(&weatherAverage->uvi, &weatherFinal->uvi);
+            DEBUG_printf("UVI: %.2f\n", weatherFinal->uvi.value);
+            break;
 
-        avg_data_compute(&weatherAverage->uvi, &weatherFinal->uvi);
-        DEBUG_printf("UVI: %.2f\n", weatherFinal->uvi.value);
+        case COMPUTE_SEND_DATA:
+            if (!queue_try_add(&weatherFinalQueue, weatherFinal))
+                DEBUG_printf("Final weather queue full\n");
+            break;
+        }
     }
 }
