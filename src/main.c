@@ -462,6 +462,51 @@ bool ltr390_init(ltr390_t *ltr390) {
     }
 }
 
+void hdc3022_sample(hdc3022_t *hdc3022, avgData_t *tempAvg, avgData_t *humidityAvg) {
+    float temp, humidity;
+    if (!hdc3022_readout_auto_meas(hdc3022, HDC3022_AUTO_MEAS_READOUT, HDC3022_TEMP_CELSIUS, &temp,
+                                   &humidity)) {
+        ERROR_printf("Error doing the HDC3022 readout\n");
+        return;
+    }
+    if (tempAvg)
+        avg_data_update(tempAvg, temp);
+    if (humidityAvg)
+        avg_data_update(humidityAvg, humidity);
+}
+
+void dps310_sample(dps310_t *dps310, avgData_t *presAvg) {
+    float pres;
+    if (!dps310_read_pres(dps310, &pres, true)) {
+        ERROR_printf("Error doing the DPS310 readout\n");
+        return;
+    }
+    pres = PA_TO_HPA(pres);
+    if (presAvg)
+        avg_data_update(presAvg, pres);
+}
+
+void ltr390_sample(ltr390_t *ltr390, avgData_t *avgLux, avgData_t *avgUvi) {
+    float lux, uvi;
+    if (avgLux) {
+        if (!ltr390_set_mode(ltr390, LTR390_ALS_MODE))
+            return;
+        sleep_ms(LTR390_INT_TIME_MS);
+        if (!ltr390_read_lux(ltr390, &lux))
+            return;
+        avg_data_update(avgLux, lux);
+    }
+    if (avgUvi) {
+        if (!ltr390_set_mode(ltr390, LTR390_UVS_MODE))
+            return;
+        sleep_ms(LTR390_INT_TIME_MS);
+        if (!ltr390_read_uvi(ltr390, &uvi))
+            return;
+
+        avg_data_update(avgUvi, uvi);
+    }
+}
+
 int main(void) {
     stdio_init_all();
 
@@ -538,47 +583,18 @@ void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *wea
             peak_wind_update(&weatherAverage->windDirection);
             break;
 
-        case SAMPLE_HDC3022: {
-            float temp, humidity;
-            if (!hdc3022_readout_auto_meas(&weatherSensor->hdc3022, HDC3022_AUTO_MEAS_READOUT,
-                                           HDC3022_TEMP_CELSIUS, &temp, &humidity)) {
-                ERROR_printf("Error doing the HDC3022 readout\n");
-                break;
-            }
-            avg_data_update(&weatherAverage->temperature, temp);
-            avg_data_update(&weatherAverage->humidity, humidity);
+        case SAMPLE_HDC3022:
+            hdc3022_sample(&weatherSensor->hdc3022, &weatherAverage->temperature,
+                           &weatherAverage->humidity);
             break;
-        }
 
-        case SAMPLE_DPS310: {
-            float pres;
-            if (!dps310_read_pres(&weatherSensor->dps310, &pres, true)) {
-                ERROR_printf("Error doing the DPS310 readout\n");
-                break;
-            }
-            pres = PA_TO_HPA(pres);
-            avg_data_update(&weatherAverage->pressure, pres);
+        case SAMPLE_DPS310:
+            dps310_sample(&weatherSensor->dps310, &weatherAverage->pressure);
             break;
-        }
 
-        case SAMPLE_LTR390: {
-            float lux, uvi;
-            if (!ltr390_set_mode(&weatherSensor->ltr390, LTR390_ALS_MODE))
-                break;
-            sleep_ms(LTR390_INT_TIME_MS);
-            if (!ltr390_read_lux(&weatherSensor->ltr390, &lux))
-                break;
-
-            if (!ltr390_set_mode(&weatherSensor->ltr390, LTR390_UVS_MODE))
-                break;
-            sleep_ms(LTR390_INT_TIME_MS);
-            if (!ltr390_read_uvi(&weatherSensor->ltr390, &uvi))
-                break;
-
-            avg_data_update(&weatherAverage->lux, lux);
-            avg_data_update(&weatherAverage->uvi, uvi);
+        case SAMPLE_LTR390:
+            ltr390_sample(&weatherSensor->ltr390, &weatherAverage->lux, &weatherAverage->uvi);
             break;
-        }
         } // End switch
     }
 }
