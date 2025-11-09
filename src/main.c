@@ -18,7 +18,7 @@
 #define I2C_SPEED 100000 // 100kHz
 
 // Time config
-#define SAMPLE_INTERVAL_MS 3000   // 3 sec
+#define SAMPLE_INTERVAL_MS 2000   // 2 sec
 #define COMPUTE_INTERVAL_MS 10000 // 10 sec
 #define SAMPLE_INTERVAL_S (SAMPLE_INTERVAL_MS / 1000)
 #define COMPUTE_INTERVAL_S (COMPUTE_INTERVAL_MS / 1000)
@@ -79,6 +79,7 @@ typedef struct {
 typedef struct {
     float sumXRad;
     float sumYRad;
+    float lastDirRad;
     uint32_t count;
 } circAvgData_t;
 
@@ -172,6 +173,7 @@ static inline void avg_data_reset(avgData_t *avgData) {
 }
 
 static inline void circ_avg_data_update(circAvgData_t *circAvgData, float dirRad) {
+    circAvgData->lastDirRad = dirRad;
     circAvgData->sumXRad += cosf(dirRad);
     circAvgData->sumYRad += sinf(dirRad);
     circAvgData->count++;
@@ -213,7 +215,8 @@ static inline void interrupt_data_reset(interruptSensor_t *intData) {
     intData->interrupts = 0;
 }
 
-static inline void peak_wind_speed_compute(peakInterruptSensor_t *peakSpeedData, finalData_t *finalData) {
+static inline void peak_wind_speed_compute(peakInterruptSensor_t *peakSpeedData,
+                                           finalData_t *finalData) {
     finalData->value = get_wind_speed_kmh(peakSpeedData->peakInterrupts, SAMPLE_INTERVAL_S);
     finalData->valid = true;
 }
@@ -221,6 +224,18 @@ static inline void peak_wind_speed_compute(peakInterruptSensor_t *peakSpeedData,
 static inline void peak_interrupt_data_update(peakInterruptSensor_t *intData) {
     if (intData->interrupts > intData->peakInterrupts) {
         intData->peakInterrupts = intData->interrupts;
+    }
+    intData->interrupts = 0;
+}
+
+static inline void peak_wind_and_direction_update(peakInterruptSensor_t *intData,
+                                                  circAvgData_t *windVane, finalData_t *finalData) {
+    if (intData->interrupts >= intData->peakInterrupts) {
+        intData->peakInterrupts = intData->interrupts;
+        if (windVane->count != 0) {
+            finalData->value = RAD_TO_DEG(windVane->lastDirRad);
+            finalData->valid = true;
+        }
     }
     intData->interrupts = 0;
 }
@@ -254,7 +269,7 @@ typedef enum {
     SAMPLE_PRES = (1 << 2),
     SAMPLE_LUX = (1 << 3),
     SAMPLE_UV = (1 << 3),
-    SAMPLE_PEAK_WIND_SPEED = (1 << 4),
+    SAMPLE_PEAK_WIND = (1 << 4),
     SAMPLE_WIND_DIRECTION = (1 << 5),
     SAMPLE_PEAK_WIND_DIRECTION = (1 << 6)
 } sampleFlags_t;
@@ -274,19 +289,19 @@ typedef enum {
 uint32_t sampleFlags = 0;
 uint32_t computeFlags = 0;
 
+// NOTE: SAMPLE_WIND_DIRECTION should always be procesed before SAMPLE_PEAK_WIND
 bool sample_callback(__unused struct repeating_timer *t) {
-    sampleFlags |= SAMPLE_PEAK_WIND_SPEED;
     sampleFlags |= SAMPLE_WIND_DIRECTION;
-    sampleFlags |= SAMPLE_PEAK_WIND_DIRECTION;
+    sampleFlags |= SAMPLE_PEAK_WIND;
     return true;
 }
 
 bool compute_callback(__unused struct repeating_timer *t) {
     DEBUG_printf("\n");
     computeFlags |= COMPUTE_RAINFALL;
+    computeFlags |= COMPUTE_WIND_DIRECTION;
     computeFlags |= COMPUTE_WIND_SPEED;
     computeFlags |= COMPUTE_PEAK_WIND_SPEED;
-    computeFlags |= COMPUTE_WIND_DIRECTION;
     return true;
 }
 
@@ -352,16 +367,19 @@ int main(void) {
     return 0;
 }
 
+// NOTE: SAMPLE_PEAK_WIND should always be procesed before SAMPLE_PEAK_WIND_DIRECTION
 void process_sample_flags() {
-    if (sampleFlags & SAMPLE_PEAK_WIND_SPEED) {
-        sampleFlags &= ~SAMPLE_PEAK_WIND_SPEED;
-
-        peak_interrupt_data_update(&weatherInternal.peakWindSpeed);
-    }
     if (sampleFlags & SAMPLE_WIND_DIRECTION) {
         sampleFlags &= ~SAMPLE_WIND_DIRECTION;
 
         wind_direction_update(&weatherInternal.windDirection);
+    }
+    if (sampleFlags & SAMPLE_PEAK_WIND) {
+        sampleFlags &= ~SAMPLE_PEAK_WIND;
+
+        peak_wind_and_direction_update(&weatherInternal.peakWindSpeed,
+                                       &weatherInternal.windDirection,
+                                       &weatherData.peakWindDirectionDeg);
     }
 }
 
@@ -389,6 +407,7 @@ void process_compute_flags() {
         peak_interrupt_data_reset(&weatherInternal.peakWindSpeed);
 
         DEBUG_printf("Peak wind speed: %f km/h\n", weatherData.peakWindSpeedKmH.value);
+        DEBUG_printf("Peak wind direction: %fº\n", weatherData.peakWindDirectionDeg.value);
     }
     if (computeFlags & COMPUTE_WIND_DIRECTION) {
         computeFlags &= ~COMPUTE_WIND_DIRECTION;
