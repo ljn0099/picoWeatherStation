@@ -2,6 +2,7 @@
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/watchdog.h"
+#include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
 
@@ -355,6 +356,7 @@ bool compute_callback(__unused struct repeating_timer *t) {
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_PRES);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_LUX);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_UVI);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_SEND_DATA);
     return true;
 }
 
@@ -372,6 +374,8 @@ void gpio_callback(uint gpio, uint32_t events) {
 
 void process_sample_queue();
 void process_compute_queue();
+
+void core1_entry(void);
 
 bool hdc3022_init(hdc3022_t *hdc3022) {
     if (!hdc3022_init_struct(hdc3022, I2C_BUS, HDC3022_DEFAULT_ADDR, HDC3022_AUTO_MEAS_NONE,
@@ -550,6 +554,9 @@ int main(void) {
     queue_init(&weatherComputeQueue, sizeof(computeCmd_t), WEATHER_COMPUTE_QUEUE_SIZE);
     queue_init(&weatherSampleQueue, sizeof(sampleCmd_t), WEATHER_SAMPLE_QUEUE_SIZE);
 
+    // Init core 1
+    multicore_launch_core1(core1_entry);
+
     // Timers
     struct repeating_timer computeTimer;
     if (!add_repeating_timer_ms(-COMPUTE_INTERVAL_MS, compute_callback, NULL, &computeTimer)) {
@@ -604,54 +611,73 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
         switch (cmd) {
         case COMPUTE_RAINFALL:
             rain_gauge_compute(&weatherFinal->rainfallMM);
-            DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal->rainfallMM.value);
+            // DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal->rainfallMM.value);
             break;
 
         case COMPUTE_WIND_SPEED:
             wind_speed_average_compute(&weatherFinal->windSpeedKmH);
-            DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal->windSpeedKmH.value);
+            // DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal->windSpeedKmH.value);
             break;
 
         case COMPUTE_WIND_DIRECTION:
             wind_direction_compute(&weatherAverage->windDirection, &weatherFinal->windDirectionDeg);
-            DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal->windDirectionDeg.value);
+            // DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal->windDirectionDeg.value);
             break;
 
         case COMPUTE_PEAK_WIND:
             peak_wind_compute(&weatherFinal->peakWindSpeedKmH, &weatherFinal->peakWindDirectionDeg);
-            DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal->peakWindSpeedKmH.value);
-            DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal->peakWindDirectionDeg.value);
+            // DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal->peakWindSpeedKmH.value);
+            // DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal->peakWindDirectionDeg.value);
             break;
 
         case COMPUTE_TEMP:
             avg_data_compute(&weatherAverage->temperature, &weatherFinal->temperatureCelsius);
-            DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal->temperatureCelsius.value);
+            // DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal->temperatureCelsius.value);
             break;
 
         case COMPUTE_HUMIDITY:
             avg_data_compute(&weatherAverage->humidity, &weatherFinal->humidityRh);
-            DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal->humidityRh.value);
+            // DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal->humidityRh.value);
             break;
 
         case COMPUTE_PRES:
             avg_data_compute(&weatherAverage->pressure, &weatherFinal->pressureHPA);
-            DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal->pressureHPA.value);
+            // DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal->pressureHPA.value);
             break;
 
         case COMPUTE_LUX:
             avg_data_compute(&weatherAverage->lux, &weatherFinal->lux);
-            DEBUG_printf("Lux: %.2f\n", weatherFinal->lux.value);
+            // DEBUG_printf("Lux: %.2f\n", weatherFinal->lux.value);
             break;
 
         case COMPUTE_UVI:
             avg_data_compute(&weatherAverage->uvi, &weatherFinal->uvi);
-            DEBUG_printf("UVI: %.2f\n", weatherFinal->uvi.value);
+            // DEBUG_printf("UVI: %.2f\n", weatherFinal->uvi.value);
             break;
 
         case COMPUTE_SEND_DATA:
             if (!queue_try_add(&weatherFinalQueue, weatherFinal))
                 DEBUG_printf("Final weather queue full\n");
+            *weatherFinal = (weatherFinal_t){0};
             break;
         }
+    }
+}
+
+void core1_entry(void) {
+    DEBUG_printf("Hello from core 1 :)\n");
+    weatherFinal_t weatherFinal = {0};
+    while (1) {
+        queue_remove_blocking(&weatherFinalQueue, &weatherFinal);
+        DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
+        DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal.windSpeedKmH.value);
+        DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal.windDirectionDeg.value);
+        DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal.peakWindSpeedKmH.value);
+        DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal.peakWindDirectionDeg.value);
+        DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal.temperatureCelsius.value);
+        DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal.humidityRh.value);
+        DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal.pressureHPA.value);
+        DEBUG_printf("Lux: %.2f\n", weatherFinal.lux.value);
+        DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
     }
 }

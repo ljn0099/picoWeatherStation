@@ -4,6 +4,7 @@ add_executable(picoWeatherStation
 
 target_link_libraries(picoWeatherStation
     pico_stdlib
+    pico_multicore
     hardware_i2c
     hardware_gpio
     hardware_adc
