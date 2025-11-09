@@ -9,6 +9,7 @@
 #include "sensor/dps310.h"
 #include "sensor/hdc3022.h"
 #include "sensor/ltr390.h"
+#include "sensor/pcf8523.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -52,6 +53,8 @@
 #define WIND_VANE_ADC_CHANNEL 0
 
 // Constants
+#define BASE_CENTURY 2000
+
 #define ANEMOMETER_FACTOR 2.4f
 #define PLUVIOMETER_FACTOR 0.2794f
 
@@ -138,6 +141,7 @@ typedef struct {
     hdc3022_t hdc3022;
     dps310_t dps310;
     ltr390_t ltr390;
+    pcf8523_t pcf8523;
 } weatherSensor_t;
 
 // Struct for averages accumulation
@@ -152,6 +156,7 @@ typedef struct {
 
 // Struct with the final data
 typedef struct {
+    uint64_t epochTime;
     finalData_t windSpeedKmH;
     finalData_t windDirectionDeg;
 
@@ -325,6 +330,7 @@ typedef enum {
     COMPUTE_PEAK_WIND,
     COMPUTE_WIND_DIRECTION,
     COMPUTE_RAINFALL,
+    COMPUTE_TIMESTAMP,
     COMPUTE_SEND_DATA
 } computeCmd_t;
 
@@ -356,6 +362,8 @@ bool compute_callback(__unused struct repeating_timer *t) {
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_PRES);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_LUX);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_UVI);
+
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_TIMESTAMP);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_SEND_DATA);
     return true;
 }
@@ -466,6 +474,41 @@ bool ltr390_init(ltr390_t *ltr390) {
     }
 }
 
+bool pcf8523_init(pcf8523_t *pcf8523) {
+    if (!pcf8523_init_struct(pcf8523, I2C_BUS, PCF8523_ADDRESS, true, false)) {
+        ERROR_printf("Error initializating the pcf8523 struct\n");
+        return false;
+    }
+    if (!pcf8523_soft_reset(pcf8523)) {
+        ERROR_printf("Error resetting pcf8523\n");
+        return false;
+    }
+    // Wait to oscilator to stabilize
+    sleep_ms(2000);
+    if (!pcf8523_clear_os_integrity_flag(pcf8523)) {
+        ERROR_printf("Error clearing pcf8523 oscilator intergrity flag\n");
+        return false;
+    }
+
+    pcf8523_Datetime_t testDatetime = {
+        .sec = 0,
+        .min = 0,
+        .hour = 0,
+        .hourMode = PCF8523_HOUR_MODE_24H,
+        .day = 1,
+        .weekDay = 0, // Saturday (0 = sunday, 6 = saturday)
+        .month = 1,
+        .year = 0,
+    };
+
+    if (!pcf8523_set_datetime(pcf8523, &testDatetime)) {
+        ERROR_printf("Error setting the datetime\n");
+        return false;
+    }
+
+    return true;
+}
+
 void hdc3022_sample(hdc3022_t *hdc3022, avgData_t *tempAvg, avgData_t *humidityAvg) {
     float temp, humidity;
     if (!hdc3022_readout_auto_meas(hdc3022, HDC3022_AUTO_MEAS_READOUT, HDC3022_TEMP_CELSIUS, &temp,
@@ -511,6 +554,15 @@ void ltr390_sample(ltr390_t *ltr390, avgData_t *avgLux, avgData_t *avgUvi) {
     }
 }
 
+void pcf8523_set_epoch(pcf8523_t *pcf8523, uint64_t *epochTime) {
+    pcf8523_Datetime_t datetime;
+    if (!pcf8523_read_datetime(pcf8523, &datetime)) {
+        panic("Error reading timestamp from pcf8523");
+    }
+
+    *epochTime = pcf8523_datetime_to_epoch(&datetime, BASE_CENTURY);
+}
+
 int main(void) {
     stdio_init_all();
 
@@ -536,6 +588,9 @@ int main(void) {
     gpio_pull_up(I2C_SCL);
 
     // HDC3022
+    if (!pcf8523_init(&weatherSensor.pcf8523)) {
+        panic("Error initializing pcf8523");
+    }
     hdc3022_init(&weatherSensor.hdc3022);
     dps310_init(&weatherSensor.dps310);
     ltr390_init(&weatherSensor.ltr390);
@@ -570,7 +625,7 @@ int main(void) {
     // Main loop
     while (1) {
         process_sample_queue(&weatherAverage, &weatherSensor);
-        process_compute_queue(&weatherAverage, &weatherFinal);
+        process_compute_queue(&weatherAverage, &weatherFinal, &weatherSensor);
         // watchdog_update();
     }
 
@@ -605,7 +660,8 @@ void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *wea
     }
 }
 
-void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *weatherFinal) {
+void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *weatherFinal,
+                           weatherSensor_t *weatherSensor) {
     computeCmd_t cmd;
     while (queue_try_remove(&weatherComputeQueue, &cmd)) {
         switch (cmd) {
@@ -621,13 +677,15 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
 
         case COMPUTE_WIND_DIRECTION:
             wind_direction_compute(&weatherAverage->windDirection, &weatherFinal->windDirectionDeg);
-            // DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal->windDirectionDeg.value);
+            // DEBUG_printf("Average wind direction: %.2fº\n",
+            // weatherFinal->windDirectionDeg.value);
             break;
 
         case COMPUTE_PEAK_WIND:
             peak_wind_compute(&weatherFinal->peakWindSpeedKmH, &weatherFinal->peakWindDirectionDeg);
             // DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal->peakWindSpeedKmH.value);
-            // DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal->peakWindDirectionDeg.value);
+            // DEBUG_printf("Peak wind direction: %.2fº\n",
+            // weatherFinal->peakWindDirectionDeg.value);
             break;
 
         case COMPUTE_TEMP:
@@ -655,6 +713,10 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
             // DEBUG_printf("UVI: %.2f\n", weatherFinal->uvi.value);
             break;
 
+        case COMPUTE_TIMESTAMP:
+            pcf8523_set_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTime);
+            break;
+
         case COMPUTE_SEND_DATA:
             if (!queue_try_add(&weatherFinalQueue, weatherFinal))
                 DEBUG_printf("Final weather queue full\n");
@@ -669,6 +731,8 @@ void core1_entry(void) {
     weatherFinal_t weatherFinal = {0};
     while (1) {
         queue_remove_blocking(&weatherFinalQueue, &weatherFinal);
+        DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTime-COMPUTE_INTERVAL_S);
+        DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTime);
         DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
         DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal.windSpeedKmH.value);
         DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal.windDirectionDeg.value);

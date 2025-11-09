@@ -12,6 +12,7 @@ target_link_libraries(picoWeatherStation
     sensor_dps310
     sensor_hdc3022
     sensor_ltr390
+    sensor_pcf8523
 )
 
 pico_enable_stdio_usb(picoWeatherStation 0)
