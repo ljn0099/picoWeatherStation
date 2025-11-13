@@ -521,8 +521,6 @@ int main(void) {
     cancel_repeating_timer(&computeTimer);
     cancel_repeating_timer(&sampleTimer);
 
-    cyw43_arch_deinit();
-
     return 0;
 }
 
@@ -663,4 +661,8 @@ void core1_entry(void) {
         DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
         DEBUG_printf("\n");
     }
+
+    cyw43_arch_deinit();
+
+    return 0;
 }
