@@ -584,7 +584,7 @@ typedef struct {
     async_at_time_worker_t resendWorker;
 } ntp_t;
 
-static void ntp_result(ntp_t* state, int status, time_t *result) {
+static void ntp_result(ntp_t *state, int status, time_t *result) {
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
     if (status == 0 && result) {
         uint64_t epoch = (uint64_t)(*result);
@@ -592,7 +592,9 @@ static void ntp_result(ntp_t* state, int status, time_t *result) {
         free(state);
     }
     else {
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),  &state->requestWorker, NTP_TEST_TIME_MS)); // repeat the request in future
+        hard_assert(async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->requestWorker,
+            NTP_TEST_TIME_MS)); // repeat the request in future
         DEBUG_printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
     }
 }
@@ -605,7 +607,7 @@ static void ntp_request(ntp_t *state) {
     // case you switch the cyw43_arch type later.
     cyw43_arch_lwip_begin();
     struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
-    uint8_t *req = (uint8_t *) p->payload;
+    uint8_t *req = (uint8_t *)p->payload;
     memset(req, 0, NTP_MSG_LEN);
     req[0] = 0x1b;
     udp_sendto(state->ntpPcb, p, &state->ntpServerAddress, NTP_PORT);
@@ -615,30 +617,32 @@ static void ntp_request(ntp_t *state) {
 
 // Call back with a DNS result
 static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
-    ntp_t *state = (ntp_t*)arg;
+    ntp_t *state = (ntp_t *)arg;
     if (ipaddr) {
         state->ntpServerAddress = *ipaddr;
         DEBUG_printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
         ntp_request(state);
-    } else {
+    }
+    else {
         DEBUG_printf("ntp dns request failed\n");
         ntp_result(state, -1, NULL);
     }
 }
 
 // NTP data received
-static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port) {
-    ntp_t *state = (ntp_t*)arg;
+static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
+                     u16_t port) {
+    ntp_t *state = (ntp_t *)arg;
     uint8_t mode = pbuf_get_at(p, 0) & 0x7;
     uint8_t stratum = pbuf_get_at(p, 1);
 
     // Check the result
-    if (ip_addr_cmp(addr, &state->ntpServerAddress) && port == NTP_PORT && p->tot_len == NTP_MSG_LEN &&
-        mode == 0x4 && stratum != 0) {
+    if (ip_addr_cmp(addr, &state->ntpServerAddress) && port == NTP_PORT &&
+        p->tot_len == NTP_MSG_LEN && mode == 0x4 && stratum != 0) {
         uint8_t seconds_buf[4] = {0};
         pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
-        uint32_t seconds_since_1900 = seconds_buf[0] << 24 | seconds_buf[1] << 16 |
-                                      seconds_buf[2] << 8  | seconds_buf[3];
+        uint32_t seconds_since_1900 =
+            seconds_buf[0] << 24 | seconds_buf[1] << 16 | seconds_buf[2] << 8 | seconds_buf[3];
 
         // Rollover adjustment (~2036/2037)
         if (seconds_since_1900 < NTP_DELTA) {
@@ -649,7 +653,8 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
         time_t epoch = (time_t)seconds_since_1970;
 
         ntp_result(state, 0, &epoch);
-    } else {
+    }
+    else {
         DEBUG_printf("invalid ntp response\n");
         ntp_result(state, -1, NULL);
     }
@@ -658,12 +663,15 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
 
 // Called to make a NTP request
 static void request_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
-    ntp_t* state = (ntp_t*)worker->user_data;
-    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->resendWorker, NTP_RESEND_TIME_MS)); // in case UDP request is lost
+    ntp_t *state = (ntp_t *)worker->user_data;
+    hard_assert(
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->resendWorker,
+                                               NTP_RESEND_TIME_MS)); // in case UDP request is lost
     int err = dns_gethostbyname(NTP_SERVER, &state->ntpServerAddress, ntp_dns_found, state);
     if (err == ERR_OK) {
         ntp_request(state); // Cached DNS result, make NTP request
-    } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
+    }
+    else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
         DEBUG_printf("dns request failed\n");
         ntp_result(state, -1, NULL);
     }
@@ -671,13 +679,13 @@ static void request_worker_fn(__unused async_context_t *context, async_at_time_w
 
 // Called to resend an NTP request if it appears to get lost
 static void resend_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
-    ntp_t* state = (ntp_t*)worker->user_data;
+    ntp_t *state = (ntp_t *)worker->user_data;
     DEBUG_printf("ntp request failed\n");
     ntp_result(state, -1, NULL);
 }
 
-static ntp_t* ntp_init(void) {
-    ntp_t *state = (ntp_t*)calloc(1, sizeof(ntp_t));
+static ntp_t *ntp_init(void) {
+    ntp_t *state = (ntp_t *)calloc(1, sizeof(ntp_t));
     if (!state) {
         DEBUG_printf("failed to allocate state for ntp\n");
         return NULL;
@@ -699,7 +707,8 @@ static ntp_t* ntp_init(void) {
 // Runs ntp test forever
 static void ntp_start_request(void) {
     ntp_t *state = ntp_init();
-    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->requestWorker, 0));
+    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                       &state->requestWorker, 0));
 }
 
 int main(void) {
@@ -898,7 +907,8 @@ void core1_entry(void) {
 
     cyw43_arch_enable_sta_mode();
 
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK,
+                                           30000)) {
         panic("Failed to connect to the wifi");
     }
 
