@@ -663,6 +663,4 @@ void core1_entry(void) {
     }
 
     cyw43_arch_deinit();
-
-    return 0;
 }
