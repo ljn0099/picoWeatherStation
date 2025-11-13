@@ -6,6 +6,11 @@
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
 
+#include "lwip/dns.h"
+#include "lwip/pbuf.h"
+#include "lwip/udp.h"
+#include "pico/cyw43_arch.h"
+
 #include "sensor/dps310.h"
 #include "sensor/hdc3022.h"
 #include "sensor/ltr390.h"
@@ -13,6 +18,20 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+// DNS
+#define DNS_SERVER "1.1.1.1"
+#define DNS_SERVER_ALT "1.0.0.1"
+
+// NTP
+#define NTP_SERVER "ntp.roa.es"
+#define NTP_PORT 123
+#define NTP_MSG_LEN 48
+#define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
+#define NTP_TEST_TIME_MS (30 * 1000)
+#define NTP_RESEND_TIME_MS (10 * 1000)
 
 // I2C Config
 #define I2C_BUS i2c0
@@ -337,6 +356,7 @@ typedef enum {
 queue_t weatherFinalQueue;
 queue_t weatherComputeQueue;
 queue_t weatherSampleQueue;
+queue_t epochTimeQueue;
 
 // NOTE: SAMPLE_WIND_DIRECTION should always be procesed before SAMPLE_PEAK_WIND
 bool sample_callback(__unused struct repeating_timer *t) {
@@ -349,7 +369,6 @@ bool sample_callback(__unused struct repeating_timer *t) {
 }
 
 bool compute_callback(__unused struct repeating_timer *t) {
-    DEBUG_printf("\n"); // Separate meas intervals with \n
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_RAINFALL);
 
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_WIND_DIRECTION);
@@ -490,18 +509,13 @@ bool pcf8523_init(pcf8523_t *pcf8523) {
         return false;
     }
 
-    pcf8523_Datetime_t testDatetime = {
-        .sec = 0,
-        .min = 0,
-        .hour = 0,
-        .hourMode = PCF8523_HOUR_MODE_24H,
-        .day = 1,
-        .weekDay = 0, // Saturday (0 = sunday, 6 = saturday)
-        .month = 1,
-        .year = 0,
-    };
+    return true;
+}
 
-    if (!pcf8523_set_datetime(pcf8523, &testDatetime)) {
+bool pcf8523_set(pcf8523_t *pcf8523, uint64_t epochTime) {
+    pcf8523_Datetime_t dt = epoch_to_pcf8523_datetime(epochTime);
+
+    if (!pcf8523_set_datetime(pcf8523, &dt)) {
         ERROR_printf("Error setting the datetime\n");
         return false;
     }
@@ -554,13 +568,151 @@ void ltr390_sample(ltr390_t *ltr390, avgData_t *avgLux, avgData_t *avgUvi) {
     }
 }
 
-void pcf8523_set_epoch(pcf8523_t *pcf8523, uint64_t *epochTime) {
+void pcf8523_get_epoch(pcf8523_t *pcf8523, uint64_t *epochTime) {
     pcf8523_Datetime_t datetime;
     if (!pcf8523_read_datetime(pcf8523, &datetime)) {
         panic("Error reading timestamp from pcf8523");
     }
 
     *epochTime = pcf8523_datetime_to_epoch(&datetime, BASE_CENTURY);
+}
+
+typedef struct {
+    ip_addr_t ntpServerAddress;
+    struct udp_pcb *ntpPcb;
+    async_at_time_worker_t requestWorker;
+    async_at_time_worker_t resendWorker;
+    bool epochObtained;
+    uint64_t epoch;
+} ntp_t;
+
+static void ntp_result(ntp_t* state, int status, time_t *result) {
+    async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
+    if (status == 0 && result) {
+        state->epoch = *result;
+        state->epochObtained = true;
+    }
+    else {
+        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),  &state->requestWorker, NTP_TEST_TIME_MS)); // repeat the request in future
+        printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
+    }
+}
+
+// Make an NTP request
+static void ntp_request(ntp_t *state) {
+    // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
+    // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
+    // these calls are a no-op and can be omitted, but it is a good practice to use them in
+    // case you switch the cyw43_arch type later.
+    cyw43_arch_lwip_begin();
+    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
+    uint8_t *req = (uint8_t *) p->payload;
+    memset(req, 0, NTP_MSG_LEN);
+    req[0] = 0x1b;
+    udp_sendto(state->ntpPcb, p, &state->ntpServerAddress, NTP_PORT);
+    pbuf_free(p);
+    cyw43_arch_lwip_end();
+}
+
+// Call back with a DNS result
+static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
+    ntp_t *state = (ntp_t*)arg;
+    if (ipaddr) {
+        state->ntpServerAddress = *ipaddr;
+        printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
+        ntp_request(state);
+    } else {
+        printf("ntp dns request failed\n");
+        ntp_result(state, -1, NULL);
+    }
+}
+
+// NTP data received
+static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port) {
+    ntp_t *state = (ntp_t*)arg;
+    uint8_t mode = pbuf_get_at(p, 0) & 0x7;
+    uint8_t stratum = pbuf_get_at(p, 1);
+
+    // Check the result
+    if (ip_addr_cmp(addr, &state->ntpServerAddress) && port == NTP_PORT && p->tot_len == NTP_MSG_LEN &&
+        mode == 0x4 && stratum != 0) {
+        uint8_t seconds_buf[4] = {0};
+        pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
+        uint32_t seconds_since_1900 = seconds_buf[0] << 24 | seconds_buf[1] << 16 |
+                                      seconds_buf[2] << 8  | seconds_buf[3];
+
+        // Rollover adjustment (~2036/2037)
+        if (seconds_since_1900 < NTP_DELTA) {
+            seconds_since_1900 += 0x100000000; // 2^32
+        }
+
+        uint32_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA;
+        time_t epoch = (time_t)seconds_since_1970;
+
+        ntp_result(state, 0, &epoch);
+    } else {
+        printf("invalid ntp response\n");
+        ntp_result(state, -1, NULL);
+    }
+    pbuf_free(p);
+}
+
+// Called to make a NTP request
+static void request_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
+    ntp_t* state = (ntp_t*)worker->user_data;
+    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->resendWorker, NTP_RESEND_TIME_MS)); // in case UDP request is lost
+    int err = dns_gethostbyname(NTP_SERVER, &state->ntpServerAddress, ntp_dns_found, state);
+    if (err == ERR_OK) {
+        ntp_request(state); // Cached DNS result, make NTP request
+    } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
+        printf("dns request failed\n");
+        ntp_result(state, -1, NULL);
+    }
+}
+
+// Called to resend an NTP request if it appears to get lost
+static void resend_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
+    ntp_t* state = (ntp_t*)worker->user_data;
+    printf("ntp request failed\n");
+    ntp_result(state, -1, NULL);
+}
+
+static ntp_t* ntp_init(void) {
+    ntp_t *state = (ntp_t*)calloc(1, sizeof(ntp_t));
+    if (!state) {
+        printf("failed to allocate state for ntp\n");
+        return NULL;
+    }
+    state->ntpPcb = udp_new_ip_type(IPADDR_TYPE_ANY);
+    if (!state->ntpPcb) {
+        printf("failed to create pcb for ntp\n");
+        free(state);
+        return NULL;
+    }
+    udp_recv(state->ntpPcb, ntp_recv, state);
+    state->requestWorker.do_work = request_worker_fn;
+    state->requestWorker.user_data = state;
+    state->resendWorker.do_work = resend_worker_fn;
+    state->resendWorker.user_data = state;
+    return state;
+}
+
+// Runs ntp test forever
+uint64_t get_ntp_epoch(void) {
+    ntp_t *state = ntp_init();
+    if (!state)
+        return 0;
+
+    hard_assert(async_context_add_at_time_worker_in_ms(
+        cyw43_arch_async_context(), &state->requestWorker, 0));
+
+    while (!state->epochObtained) {
+        sleep_ms(100);
+    }
+
+    uint64_t result = state->epoch;
+    free(state);
+    return result;
 }
 
 int main(void) {
@@ -571,6 +723,15 @@ int main(void) {
     weatherAverage_t weatherAverage = {0};
     weatherFinal_t weatherFinal = {0};
     weatherSensor_t weatherSensor = {0};
+
+    // Queue
+    queue_init(&weatherFinalQueue, sizeof(weatherFinal_t), WEATHER_FINAL_QUEUE_SIZE);
+    queue_init(&weatherComputeQueue, sizeof(computeCmd_t), WEATHER_COMPUTE_QUEUE_SIZE);
+    queue_init(&weatherSampleQueue, sizeof(sampleCmd_t), WEATHER_SAMPLE_QUEUE_SIZE);
+    queue_init(&epochTimeQueue, sizeof(uint64_t), 1);
+
+    // Init core 1
+    multicore_launch_core1(core1_entry);
 
     // Rain gauge
     gpio_init(RAIN_GAUGE_PIN);
@@ -587,12 +748,25 @@ int main(void) {
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
 
-    // HDC3022
+    // RTC
     if (!pcf8523_init(&weatherSensor.pcf8523)) {
         panic("Error initializing pcf8523");
     }
+
+    uint64_t epochTime;
+    queue_remove_blocking(&epochTimeQueue, &epochTime);
+
+    if (!pcf8523_set(&weatherSensor.pcf8523, epochTime)) {
+        panic("Error setting pcf8523 time");
+    }
+
+    // HDC3022
     hdc3022_init(&weatherSensor.hdc3022);
+
+    // DPS310
     dps310_init(&weatherSensor.dps310);
+
+    // LTR390
     ltr390_init(&weatherSensor.ltr390);
 
     // Wind vane
@@ -603,14 +777,6 @@ int main(void) {
     // IRQ
     gpio_set_irq_enabled_with_callback(RAIN_GAUGE_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
     gpio_set_irq_enabled(ANEMOMETER_PIN, GPIO_IRQ_EDGE_RISE, true);
-
-    // Queue
-    queue_init(&weatherFinalQueue, sizeof(weatherFinal_t), WEATHER_FINAL_QUEUE_SIZE);
-    queue_init(&weatherComputeQueue, sizeof(computeCmd_t), WEATHER_COMPUTE_QUEUE_SIZE);
-    queue_init(&weatherSampleQueue, sizeof(sampleCmd_t), WEATHER_SAMPLE_QUEUE_SIZE);
-
-    // Init core 1
-    multicore_launch_core1(core1_entry);
 
     // Timers
     struct repeating_timer computeTimer;
@@ -628,6 +794,15 @@ int main(void) {
         process_compute_queue(&weatherAverage, &weatherFinal, &weatherSensor);
         // watchdog_update();
     }
+
+    gpio_set_irq_enabled(RAIN_GAUGE_PIN, GPIO_IRQ_EDGE_FALL, false);
+    gpio_set_irq_enabled(ANEMOMETER_PIN, GPIO_IRQ_EDGE_RISE, false);
+    gpio_set_irq_enabled_with_callback(0, 0, false, NULL);
+
+    cancel_repeating_timer(&computeTimer);
+    cancel_repeating_timer(&sampleTimer);
+
+    cyw43_arch_deinit();
 
     return 0;
 }
@@ -714,7 +889,7 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
             break;
 
         case COMPUTE_TIMESTAMP:
-            pcf8523_set_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTime);
+            pcf8523_get_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTime);
             break;
 
         case COMPUTE_SEND_DATA:
@@ -728,10 +903,34 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
 
 void core1_entry(void) {
     DEBUG_printf("Hello from core 1 :)\n");
+
+    // CYW43
+    if (cyw43_arch_init()) {
+        panic("Failed to init cyw43");
+    }
+
+    cyw43_arch_enable_sta_mode();
+
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+        panic("Failed to connect to the wifi");
+    }
+
+    // Set dns servers
+    ip_addr_t dns1, dns2;
+
+    ip4addr_aton(DNS_SERVER, &dns1);
+    ip4addr_aton(DNS_SERVER_ALT, &dns2);
+
+    dns_setserver(0, &dns1);
+    dns_setserver(1, &dns2);
+
+    uint64_t epochTime = get_ntp_epoch();
+    queue_add_blocking(&epochTimeQueue, &epochTime);
+
     weatherFinal_t weatherFinal = {0};
     while (1) {
         queue_remove_blocking(&weatherFinalQueue, &weatherFinal);
-        DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTime-COMPUTE_INTERVAL_S);
+        DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTime - COMPUTE_INTERVAL_S);
         DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTime);
         DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
         DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal.windSpeedKmH.value);
@@ -743,5 +942,6 @@ void core1_entry(void) {
         DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal.pressureHPA.value);
         DEBUG_printf("Lux: %.2f\n", weatherFinal.lux.value);
         DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
+        DEBUG_printf("\n");
     }
 }

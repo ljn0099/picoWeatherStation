@@ -1,5 +1,21 @@
+if(NOT DEFINED WIFI_SSID OR WIFI_SSID STREQUAL "")
+    message(FATAL_ERROR "You must define WIFI_SSID (e.g. -DWIFI_SSID=\"YourWiFiName\")")
+endif()
+
+if(NOT DEFINED WIFI_PASSWORD OR WIFI_PASSWORD STREQUAL "")
+    message(FATAL_ERROR "You must define WIFI_PASSWORD (e.g. -DWIFI_PASSWORD=\"YourWiFiPassword\")")
+endif()
+
 add_executable(picoWeatherStation
     main.c
+)
+
+target_compile_definitions(picoWeatherStation PRIVATE
+        WIFI_SSID=\"${WIFI_SSID}\"
+        WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+        )
+target_include_directories(picoWeatherStation PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}
 )
 
 target_link_libraries(picoWeatherStation
@@ -13,6 +29,7 @@ target_link_libraries(picoWeatherStation
     sensor_hdc3022
     sensor_ltr390
     sensor_pcf8523
+    pico_cyw43_arch_lwip_threadsafe_background
 )
 
 pico_enable_stdio_usb(picoWeatherStation 0)
