@@ -582,19 +582,18 @@ typedef struct {
     struct udp_pcb *ntpPcb;
     async_at_time_worker_t requestWorker;
     async_at_time_worker_t resendWorker;
-    bool epochObtained;
-    uint64_t epoch;
 } ntp_t;
 
 static void ntp_result(ntp_t* state, int status, time_t *result) {
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
     if (status == 0 && result) {
-        state->epoch = *result;
-        state->epochObtained = true;
+        uint64_t epoch = (uint64_t)(*result);
+        queue_try_add(&epochTimeQueue, result);
+        free(state);
     }
     else {
         hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),  &state->requestWorker, NTP_TEST_TIME_MS)); // repeat the request in future
-        printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
+        DEBUG_printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
     }
 }
 
@@ -619,10 +618,10 @@ static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *a
     ntp_t *state = (ntp_t*)arg;
     if (ipaddr) {
         state->ntpServerAddress = *ipaddr;
-        printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
+        DEBUG_printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
         ntp_request(state);
     } else {
-        printf("ntp dns request failed\n");
+        DEBUG_printf("ntp dns request failed\n");
         ntp_result(state, -1, NULL);
     }
 }
@@ -651,7 +650,7 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
 
         ntp_result(state, 0, &epoch);
     } else {
-        printf("invalid ntp response\n");
+        DEBUG_printf("invalid ntp response\n");
         ntp_result(state, -1, NULL);
     }
     pbuf_free(p);
@@ -665,7 +664,7 @@ static void request_worker_fn(__unused async_context_t *context, async_at_time_w
     if (err == ERR_OK) {
         ntp_request(state); // Cached DNS result, make NTP request
     } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
-        printf("dns request failed\n");
+        DEBUG_printf("dns request failed\n");
         ntp_result(state, -1, NULL);
     }
 }
@@ -673,19 +672,19 @@ static void request_worker_fn(__unused async_context_t *context, async_at_time_w
 // Called to resend an NTP request if it appears to get lost
 static void resend_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
     ntp_t* state = (ntp_t*)worker->user_data;
-    printf("ntp request failed\n");
+    DEBUG_printf("ntp request failed\n");
     ntp_result(state, -1, NULL);
 }
 
 static ntp_t* ntp_init(void) {
     ntp_t *state = (ntp_t*)calloc(1, sizeof(ntp_t));
     if (!state) {
-        printf("failed to allocate state for ntp\n");
+        DEBUG_printf("failed to allocate state for ntp\n");
         return NULL;
     }
     state->ntpPcb = udp_new_ip_type(IPADDR_TYPE_ANY);
     if (!state->ntpPcb) {
-        printf("failed to create pcb for ntp\n");
+        DEBUG_printf("failed to create pcb for ntp\n");
         free(state);
         return NULL;
     }
@@ -698,21 +697,9 @@ static ntp_t* ntp_init(void) {
 }
 
 // Runs ntp test forever
-uint64_t get_ntp_epoch(void) {
+static void ntp_start_request(void) {
     ntp_t *state = ntp_init();
-    if (!state)
-        return 0;
-
-    hard_assert(async_context_add_at_time_worker_in_ms(
-        cyw43_arch_async_context(), &state->requestWorker, 0));
-
-    while (!state->epochObtained) {
-        sleep_ms(100);
-    }
-
-    uint64_t result = state->epoch;
-    free(state);
-    return result;
+    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->requestWorker, 0));
 }
 
 int main(void) {
@@ -924,8 +911,7 @@ void core1_entry(void) {
     dns_setserver(0, &dns1);
     dns_setserver(1, &dns2);
 
-    uint64_t epochTime = get_ntp_epoch();
-    queue_add_blocking(&epochTimeQueue, &epochTime);
+    ntp_start_request();
 
     weatherFinal_t weatherFinal = {0};
     while (1) {
