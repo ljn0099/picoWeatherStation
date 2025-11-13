@@ -16,6 +16,11 @@
 #include "sensor/ltr390.h"
 #include "sensor/pcf8523.h"
 
+#include "include/queues.h"
+#include "include/weather_types.h"
+#include "include/ntp.h"
+#include "include/utils.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,14 +29,6 @@
 // DNS
 #define DNS_SERVER "1.1.1.1"
 #define DNS_SERVER_ALT "1.0.0.1"
-
-// NTP
-#define NTP_SERVER "ntp.roa.es"
-#define NTP_PORT 123
-#define NTP_MSG_LEN 48
-#define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
-#define NTP_TEST_TIME_MS (30 * 1000)
-#define NTP_RESEND_TIME_MS (10 * 1000)
 
 // I2C Config
 #define I2C_BUS i2c0
@@ -83,113 +80,6 @@
 #define WIND_VANE_TOLERANCE_V 0.05f
 #define WIND_VANE_TOLERANCE_ADC (VOLT_TO_ADC(WIND_VANE_TOLERANCE_V))
 
-#define WEATHER_FINAL_QUEUE_SIZE 5
-#define WEATHER_COMPUTE_QUEUE_SIZE 16
-#define WEATHER_SAMPLE_QUEUE_SIZE 16
-
-// Utils
-#define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
-
-#define VOLT_TO_ADC(v) ((uint16_t)((v) * ((1 << ADC_BITS) - 1) / ADC_VREF))
-#define ADC_TO_VOLT(adc) ((float)(adc) * ADC_VREF / ((1 << ADC_BITS) - 1))
-
-#define RAD_TO_DEG(x) ((x) * 180.0f / M_PI)
-#define DEG_TO_RAD(x) ((x) * M_PI / 180.0f)
-#define PA_TO_HPA(x) ((x) / 100.0f)
-
-#ifndef DEBUG_printf
-#ifndef NDEBUG
-#define DEBUG_printf printf
-#else
-#define DEBUG_printf(...)
-#endif
-#endif
-
-#ifndef INFO_printf
-#define INFO_printf printf
-#endif
-
-#ifndef ERROR_printf
-#define ERROR_printf printf
-#endif
-
-#define COMPUTE_QUEUE_ADD_CMD(cmd) queue_try_add(&weatherComputeQueue, &(computeCmd_t){cmd})
-
-#define SAMPLE_QUEUE_ADD_CMD(cmd) queue_try_add(&weatherSampleQueue, &(sampleCmd_t){cmd})
-
-typedef struct {
-    float value;
-    bool valid;
-} finalData_t;
-
-typedef struct {
-    float sum;
-    uint32_t count;
-} avgData_t;
-
-typedef struct {
-    float sumXRad;
-    float sumYRad;
-    float lastDirRad;
-    uint32_t count;
-} windDirection_t;
-
-typedef struct {
-    volatile uint32_t interrupts;
-} rainfall_t;
-
-typedef struct {
-    volatile uint32_t interrupts;
-} windSpeed_t;
-
-typedef struct {
-    volatile uint32_t interrupts;
-    uint32_t peakInterrupts;
-    float peakDirectionRad;
-} peakWind_t;
-
-// Global struct because its for IRQs
-typedef struct {
-    rainfall_t rainfall;
-    windSpeed_t windSpeed;
-    peakWind_t peakWind;
-} weatherIrq_t;
-
-// Struct for sensor internals
-typedef struct {
-    hdc3022_t hdc3022;
-    dps310_t dps310;
-    ltr390_t ltr390;
-    pcf8523_t pcf8523;
-} weatherSensor_t;
-
-// Struct for averages accumulation
-typedef struct {
-    windDirection_t windDirection;
-    avgData_t temperature;
-    avgData_t humidity;
-    avgData_t pressure;
-    avgData_t lux;
-    avgData_t uvi;
-} weatherAverage_t;
-
-// Struct with the final data
-typedef struct {
-    uint64_t epochTime;
-    finalData_t windSpeedKmH;
-    finalData_t windDirectionDeg;
-
-    finalData_t peakWindSpeedKmH;
-    finalData_t peakWindDirectionDeg;
-
-    finalData_t rainfallMM;
-
-    finalData_t temperatureCelsius;
-    finalData_t humidityRh;
-    finalData_t uvi;
-    finalData_t lux;
-    finalData_t pressureHPA;
-} weatherFinal_t;
 
 typedef struct {
     uint16_t adcValue;
@@ -327,36 +217,6 @@ static inline void avg_data_compute(avgData_t *avgData, finalData_t *finalData) 
     avgData->sum = 0.0f;
     avgData->count = 0;
 }
-
-// Wind speed and rainfall don't need to be sampled in the callback because they
-// are sampled in the IRQ
-typedef enum {
-    SAMPLE_HDC3022,
-    SAMPLE_DPS310,
-    SAMPLE_LTR390,
-    SAMPLE_PEAK_WIND,
-    SAMPLE_WIND_DIRECTION,
-    SAMPLE_PEAK_WIND_DIRECTION
-} sampleCmd_t;
-
-typedef enum {
-    COMPUTE_TEMP,
-    COMPUTE_HUMIDITY,
-    COMPUTE_PRES,
-    COMPUTE_LUX,
-    COMPUTE_UVI,
-    COMPUTE_WIND_SPEED,
-    COMPUTE_PEAK_WIND,
-    COMPUTE_WIND_DIRECTION,
-    COMPUTE_RAINFALL,
-    COMPUTE_TIMESTAMP,
-    COMPUTE_SEND_DATA
-} computeCmd_t;
-
-queue_t weatherFinalQueue;
-queue_t weatherComputeQueue;
-queue_t weatherSampleQueue;
-queue_t epochTimeQueue;
 
 // NOTE: SAMPLE_WIND_DIRECTION should always be procesed before SAMPLE_PEAK_WIND
 bool sample_callback(__unused struct repeating_timer *t) {
@@ -577,140 +437,6 @@ void pcf8523_get_epoch(pcf8523_t *pcf8523, uint64_t *epochTime) {
     *epochTime = pcf8523_datetime_to_epoch(&datetime, BASE_CENTURY);
 }
 
-typedef struct {
-    ip_addr_t ntpServerAddress;
-    struct udp_pcb *ntpPcb;
-    async_at_time_worker_t requestWorker;
-    async_at_time_worker_t resendWorker;
-} ntp_t;
-
-static void ntp_result(ntp_t *state, int status, time_t *result) {
-    async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
-    if (status == 0 && result) {
-        uint64_t epoch = (uint64_t)(*result);
-        queue_try_add(&epochTimeQueue, result);
-        free(state);
-    }
-    else {
-        hard_assert(async_context_add_at_time_worker_in_ms(
-            cyw43_arch_async_context(), &state->requestWorker,
-            NTP_TEST_TIME_MS)); // repeat the request in future
-        DEBUG_printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
-    }
-}
-
-// Make an NTP request
-static void ntp_request(ntp_t *state) {
-    // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
-    // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
-    // these calls are a no-op and can be omitted, but it is a good practice to use them in
-    // case you switch the cyw43_arch type later.
-    cyw43_arch_lwip_begin();
-    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
-    uint8_t *req = (uint8_t *)p->payload;
-    memset(req, 0, NTP_MSG_LEN);
-    req[0] = 0x1b;
-    udp_sendto(state->ntpPcb, p, &state->ntpServerAddress, NTP_PORT);
-    pbuf_free(p);
-    cyw43_arch_lwip_end();
-}
-
-// Call back with a DNS result
-static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
-    ntp_t *state = (ntp_t *)arg;
-    if (ipaddr) {
-        state->ntpServerAddress = *ipaddr;
-        DEBUG_printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
-        ntp_request(state);
-    }
-    else {
-        DEBUG_printf("ntp dns request failed\n");
-        ntp_result(state, -1, NULL);
-    }
-}
-
-// NTP data received
-static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
-                     u16_t port) {
-    ntp_t *state = (ntp_t *)arg;
-    uint8_t mode = pbuf_get_at(p, 0) & 0x7;
-    uint8_t stratum = pbuf_get_at(p, 1);
-
-    // Check the result
-    if (ip_addr_cmp(addr, &state->ntpServerAddress) && port == NTP_PORT &&
-        p->tot_len == NTP_MSG_LEN && mode == 0x4 && stratum != 0) {
-        uint8_t seconds_buf[4] = {0};
-        pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
-        uint32_t seconds_since_1900 =
-            seconds_buf[0] << 24 | seconds_buf[1] << 16 | seconds_buf[2] << 8 | seconds_buf[3];
-
-        // Rollover adjustment (~2036/2037)
-        if (seconds_since_1900 < NTP_DELTA) {
-            seconds_since_1900 += 0x100000000; // 2^32
-        }
-
-        uint32_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA;
-        time_t epoch = (time_t)seconds_since_1970;
-
-        ntp_result(state, 0, &epoch);
-    }
-    else {
-        DEBUG_printf("invalid ntp response\n");
-        ntp_result(state, -1, NULL);
-    }
-    pbuf_free(p);
-}
-
-// Called to make a NTP request
-static void request_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
-    ntp_t *state = (ntp_t *)worker->user_data;
-    hard_assert(
-        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->resendWorker,
-                                               NTP_RESEND_TIME_MS)); // in case UDP request is lost
-    int err = dns_gethostbyname(NTP_SERVER, &state->ntpServerAddress, ntp_dns_found, state);
-    if (err == ERR_OK) {
-        ntp_request(state); // Cached DNS result, make NTP request
-    }
-    else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
-        DEBUG_printf("dns request failed\n");
-        ntp_result(state, -1, NULL);
-    }
-}
-
-// Called to resend an NTP request if it appears to get lost
-static void resend_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
-    ntp_t *state = (ntp_t *)worker->user_data;
-    DEBUG_printf("ntp request failed\n");
-    ntp_result(state, -1, NULL);
-}
-
-static ntp_t *ntp_init(void) {
-    ntp_t *state = (ntp_t *)calloc(1, sizeof(ntp_t));
-    if (!state) {
-        DEBUG_printf("failed to allocate state for ntp\n");
-        return NULL;
-    }
-    state->ntpPcb = udp_new_ip_type(IPADDR_TYPE_ANY);
-    if (!state->ntpPcb) {
-        DEBUG_printf("failed to create pcb for ntp\n");
-        free(state);
-        return NULL;
-    }
-    udp_recv(state->ntpPcb, ntp_recv, state);
-    state->requestWorker.do_work = request_worker_fn;
-    state->requestWorker.user_data = state;
-    state->resendWorker.do_work = resend_worker_fn;
-    state->resendWorker.user_data = state;
-    return state;
-}
-
-// Runs ntp test forever
-static void ntp_start_request(void) {
-    ntp_t *state = ntp_init();
-    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                       &state->requestWorker, 0));
-}
-
 int main(void) {
     stdio_init_all();
 
@@ -721,10 +447,7 @@ int main(void) {
     weatherSensor_t weatherSensor = {0};
 
     // Queue
-    queue_init(&weatherFinalQueue, sizeof(weatherFinal_t), WEATHER_FINAL_QUEUE_SIZE);
-    queue_init(&weatherComputeQueue, sizeof(computeCmd_t), WEATHER_COMPUTE_QUEUE_SIZE);
-    queue_init(&weatherSampleQueue, sizeof(sampleCmd_t), WEATHER_SAMPLE_QUEUE_SIZE);
-    queue_init(&epochTimeQueue, sizeof(uint64_t), 1);
+    queues_init();
 
     // Init core 1
     multicore_launch_core1(core1_entry);

@@ -8,6 +8,8 @@ endif()
 
 add_executable(picoWeatherStation
     main.c
+    queues.c
+    ntp.c
 )
 
 target_compile_definitions(picoWeatherStation PRIVATE
@@ -16,6 +18,7 @@ target_compile_definitions(picoWeatherStation PRIVATE
         )
 target_include_directories(picoWeatherStation PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
 target_link_libraries(picoWeatherStation
