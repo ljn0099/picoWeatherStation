@@ -606,7 +606,8 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
             break;
 
         case COMPUTE_TIMESTAMP:
-            pcf8523_get_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTime);
+            pcf8523_get_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTimeEnd);
+            weatherFinal->epochTimeStart = weatherFinal->epochTimeEnd - COMPUTE_INTERVAL_S;
             break;
 
         case COMPUTE_SEND_DATA:
@@ -647,8 +648,8 @@ void core1_entry(void) {
     weatherFinal_t weatherFinal = {0};
     while (1) {
         queue_remove_blocking(&weatherFinalQueue, &weatherFinal);
-        DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTime - COMPUTE_INTERVAL_S);
-        DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTime);
+        DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTimeStart);
+        DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTimeEnd);
         DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
         DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal.windSpeedKmH.value);
         DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal.windDirectionDeg.value);

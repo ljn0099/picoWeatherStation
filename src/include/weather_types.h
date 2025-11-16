@@ -65,7 +65,9 @@ typedef struct {
 
 // Struct with the final data
 typedef struct {
-    uint64_t epochTime;
+    uint64_t epochTimeStart;
+    uint64_t epochTimeEnd;
+
     finalData_t windSpeedKmH;
     finalData_t windDirectionDeg;
 
