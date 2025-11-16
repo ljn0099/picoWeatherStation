@@ -61,6 +61,7 @@ typedef struct {
     avgData_t pressure;
     avgData_t lux;
     avgData_t uvi;
+    avgData_t solarIrradiance;
 } weatherAverage_t;
 
 // Struct with the final data
@@ -81,6 +82,7 @@ typedef struct {
     finalData_t uvi;
     finalData_t lux;
     finalData_t pressureHPA;
+    finalData_t solarIrradianceWm2;
 } weatherFinal_t;
 
 // Wind speed and rainfall don't need to be sampled in the callback because they
@@ -104,6 +106,7 @@ typedef enum {
     COMPUTE_PEAK_WIND,
     COMPUTE_WIND_DIRECTION,
     COMPUTE_RAINFALL,
+    COMPUTE_SOLAR_IRRADIANCE,
     COMPUTE_TIMESTAMP,
     COMPUTE_SEND_DATA
 } computeCmd_t;

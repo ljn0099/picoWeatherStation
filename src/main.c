@@ -80,7 +80,6 @@
 #define WIND_VANE_TOLERANCE_V 0.05f
 #define WIND_VANE_TOLERANCE_ADC (VOLT_TO_ADC(WIND_VANE_TOLERANCE_V))
 
-
 typedef struct {
     uint16_t adcValue;
     float directionRad;
@@ -241,6 +240,7 @@ bool compute_callback(__unused struct repeating_timer *t) {
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_PRES);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_LUX);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_UVI);
+    COMPUTE_QUEUE_ADD_CMD(COMPUTE_SOLAR_IRRADIANCE);
 
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_TIMESTAMP);
     COMPUTE_QUEUE_ADD_CMD(COMPUTE_SEND_DATA);
@@ -407,17 +407,25 @@ void dps310_sample(dps310_t *dps310, avgData_t *presAvg) {
         avg_data_update(presAvg, pres);
 }
 
-void ltr390_sample(ltr390_t *ltr390, avgData_t *avgLux, avgData_t *avgUvi) {
-    float lux, uvi;
-    if (avgLux) {
+void ltr390_sample(ltr390_t *ltr390, avgData_t *avgLux, avgData_t *avgUvi, avgData_t *avgSolar) {
+    if (avgLux || avgSolar) {
+        float lux;
         if (!ltr390_set_mode(ltr390, LTR390_ALS_MODE))
             return;
         sleep_ms(LTR390_INT_TIME_MS);
         if (!ltr390_read_lux(ltr390, &lux))
             return;
-        avg_data_update(avgLux, lux);
+
+        if (avgLux)
+            avg_data_update(avgLux, lux);
+        if (avgSolar) {
+            float solarIrradiance = LUX_TO_WM2(lux);
+
+            avg_data_update(avgSolar, solarIrradiance);
+        }
     }
     if (avgUvi) {
+        float uvi;
         if (!ltr390_set_mode(ltr390, LTR390_UVS_MODE))
             return;
         sleep_ms(LTR390_INT_TIME_MS);
@@ -546,7 +554,7 @@ void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *wea
             break;
 
         case SAMPLE_LTR390:
-            ltr390_sample(&weatherSensor->ltr390, &weatherAverage->lux, &weatherAverage->uvi);
+            ltr390_sample(&weatherSensor->ltr390, &weatherAverage->lux, &weatherAverage->uvi, &weatherAverage->solarIrradiance);
             break;
         }
     }
@@ -605,6 +613,11 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
             // DEBUG_printf("UVI: %.2f\n", weatherFinal->uvi.value);
             break;
 
+        case COMPUTE_SOLAR_IRRADIANCE:
+            avg_data_compute(&weatherAverage->solarIrradiance, &weatherFinal->solarIrradianceWm2);
+            // DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal->solarIrradianceWm2.value);
+            break;
+
         case COMPUTE_TIMESTAMP:
             pcf8523_get_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTimeEnd);
             weatherFinal->epochTimeStart = weatherFinal->epochTimeEnd - COMPUTE_INTERVAL_S;
@@ -660,6 +673,7 @@ void core1_entry(void) {
         DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal.pressureHPA.value);
         DEBUG_printf("Lux: %.2f\n", weatherFinal.lux.value);
         DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
+        DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal.solarIrradianceWm2.value);
         DEBUG_printf("\n");
     }
 
