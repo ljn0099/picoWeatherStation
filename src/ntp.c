@@ -1,13 +1,13 @@
-#include <time.h>
+#include "include/ntp.h"
+#include "include/queues.h"
+#include "include/utils.h"
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
-#include "include/ntp.h"
-#include "include/queues.h"
-#include "include/utils.h"
+#include <time.h>
 
 static void ntp_result(ntp_t *state, int status, time_t *result) {
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
