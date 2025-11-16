@@ -10,3 +10,6 @@
 [submodule "pico-pcf8523"]
 	path = pico-pcf8523
 	url = https://github.com/ljn0099/pico-pcf8523
+[submodule "nanopb"]
+	path = nanopb
+	url = https://github.com/nanopb/nanopb.git

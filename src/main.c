@@ -20,6 +20,7 @@
 #include "include/weather_types.h"
 #include "include/ntp.h"
 #include "include/utils.h"
+#include "include/weather_protocol.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -675,6 +676,21 @@ void core1_entry(void) {
         DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
         DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal.solarIrradianceWm2.value);
         DEBUG_printf("\n");
+
+        size_t payloadLen;
+        uint8_t *payload = create_weather_payload(&weatherFinal, &payloadLen);
+
+        if (payload) {
+            printf("Payload length: %zu bytes\n", payloadLen);
+            printf("Payload (hex): ");
+            for (size_t i = 0; i < payloadLen; i++)
+                printf("%02X ", payload[i]);
+            printf("\n");
+            free(payload);
+        }
+        else {
+            printf("Error generating payload\n");
+        }
     }
 
     cyw43_arch_deinit();

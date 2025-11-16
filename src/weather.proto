@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package weather;
+
+import "google/protobuf/wrappers.proto";
+
+message WeatherMeasurement {
+  // Mandatory fields
+  uint64 periodStart = 1;
+  uint64 periodEnd = 2;
+
+  // Optional fields
+  google.protobuf.FloatValue temperature = 4;
+  google.protobuf.FloatValue humidity = 5;
+  google.protobuf.FloatValue pressure = 6;
+  google.protobuf.FloatValue lux = 7;
+  google.protobuf.FloatValue uvi = 8;
+  google.protobuf.FloatValue windSpeed = 9;
+  google.protobuf.FloatValue windDirection = 10;
+  google.protobuf.FloatValue gustSpeed = 11;
+  google.protobuf.FloatValue gustDirection = 12;
+  google.protobuf.FloatValue rainfall = 13;
+  google.protobuf.FloatValue solarIrradiance = 14;
+}
