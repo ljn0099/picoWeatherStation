@@ -84,8 +84,6 @@ typedef struct {
 #define MQTT_WILL_QOS 1
 
 #define MQTT_UNIQUE_TOPIC 1
-#define MQTT_USERNAME "picopi"
-#define MQTT_PASSWORD "picopipass"
 
 #ifndef MQTT_DEVICE_NAME
 #define MQTT_DEVICE_NAME "pico"
