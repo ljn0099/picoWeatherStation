@@ -11,15 +11,16 @@
 
 static void ntp_result(ntp_t *state, int status, time_t *result) {
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
+    async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->requestWorker);
     if (status == 0 && result) {
         uint64_t epoch = (uint64_t)(*result);
         queue_try_add(&epochTimeQueue, result);
         free(state);
     }
     else {
-        hard_assert(async_context_add_at_time_worker_in_ms(
+        async_context_add_at_time_worker_in_ms(
             cyw43_arch_async_context(), &state->requestWorker,
-            NTP_TEST_TIME_MS)); // repeat the request in future
+            NTP_TEST_TIME_MS); // repeat the request in future
         DEBUG_printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
     }
 }
