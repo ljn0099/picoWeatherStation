@@ -71,6 +71,7 @@ add_executable(picoWeatherStation
     main.c
     queues.c
     ntp.c
+    mqtt.c
     weather_protocol.c
     ${WEATHER_PB_C}
     ${WRAPPERS_PB_C}
@@ -86,6 +87,7 @@ target_compile_definitions(picoWeatherStation PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
     MQTT_USERNAME=\"${MQTT_USERNAME}\"
+    MQTT_SERVER=\"${MQTT_SERVER}\"
     MQTT_PASSWORD=\"${MQTT_PASSWORD}\"
     MQTT_CERT_INC=\"${MQTT_CERT_INC}\"
     ALTCP_MBEDTLS_AUTHMODE=MBEDTLS_SSL_VERIFY_REQUIRED

@@ -19,6 +19,7 @@
 #include "include/queues.h"
 #include "include/weather_types.h"
 #include "include/ntp.h"
+#include "include/mqtt.h"
 #include "include/utils.h"
 #include "include/weather_protocol.h"
 
@@ -659,6 +660,8 @@ void core1_entry(void) {
 
     ntp_start_request();
 
+    mqtt_start();
+
     weatherFinal_t weatherFinal = {0};
     while (1) {
         queue_remove_blocking(&weatherFinalQueue, &weatherFinal);
@@ -681,12 +684,12 @@ void core1_entry(void) {
         uint8_t *payload = create_weather_payload(&weatherFinal, &payloadLen);
 
         if (payload) {
-            printf("Payload length: %zu bytes\n", payloadLen);
-            printf("Payload (hex): ");
+            DEBUG_printf("Payload length: %zu bytes\n", payloadLen);
+            DEBUG_printf("Payload (hex): ");
             for (size_t i = 0; i < payloadLen; i++)
-                printf("%02X ", payload[i]);
-            printf("\n");
-            free(payload);
+                DEBUG_printf("%02X ", payload[i]);
+            DEBUG_printf("\n");
+            mqtt_publish_dynamic("/data", payload, payloadLen);
         }
         else {
             printf("Error generating payload\n");
