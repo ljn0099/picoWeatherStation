@@ -34,7 +34,7 @@ if (NOT MQTT_CERT_INC)
 endif()
 
 add_executable(picow_mqtt_client
-    mqtt_client.c
+    mqtt_refactor.c
     )
 target_link_libraries(picow_mqtt_client
     pico_stdlib
