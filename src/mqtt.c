@@ -10,8 +10,8 @@
 
 #include "include/mqtt.h"
 #include "include/utils.h"
-
-static mqtt_t *mqttState = NULL;
+#include "include/queues.h"
+#include "include/weather_types.h"
 
 static const char *full_topic(const char *name) {
     static char full_topic[MQTT_TOPIC_LEN];
@@ -88,6 +88,8 @@ static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection
             mqtt_publish(state->mqttClientInst, state->mqttClientInfo.will_topic, "1", 1,
                          MQTT_WILL_QOS, true, pub_request_cb, state);
         }
+        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->publishWorker, MQTT_PUBLISH_TIME_MS));
     }
     else {
         DEBUG_printf("MQTT disconnected (status %d), reconnecting...\n", status);
@@ -132,6 +134,39 @@ static void mqtt_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *
     }
 }
 
+static void publish_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
+    mqtt_t *state = (mqtt_t *)worker->user_data;
+
+    payload_t payload;
+
+    if (!queue_try_peek(&weatherSerializedQueue, &payload)) {
+        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                   &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+        return;
+    }
+
+    const char *topic = full_topic("/data");
+
+    err_t err = mqtt_publish(state->mqttClientInst,
+                             topic,
+                             payload.msg,
+                             payload.len,
+                             MQTT_PUBLISH_QOS,
+                             0,
+                             NULL,
+                             state);
+
+    if (err == ERR_OK) {
+        queue_try_remove(&weatherSerializedQueue, NULL);
+    }
+    else {
+        DEBUG_printf("Error trying to publish mqtt msg\n");
+    }
+
+    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                       &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+}
+
 static void request_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
     mqtt_t *state = (mqtt_t *)worker->user_data;
 
@@ -159,6 +194,9 @@ static mqtt_t *mqtt_init() {
     state->requestWorker.do_work = request_worker_fn;
     state->requestWorker.user_data = state;
 
+    state->publishWorker.do_work = publish_worker_fn;
+    state->publishWorker.user_data = state;
+
     state->mqttClientInfo.keep_alive = MQTT_KEEP_ALIVE_S; // Keep alive in sec
 
     state->mqttClientInfo.client_user = MQTT_USERNAME;
@@ -177,59 +215,6 @@ static mqtt_t *mqtt_init() {
     return state;
 }
 
-void mqtt_publish_worker_fn(__unused async_context_t *ctx, async_at_time_worker_t *worker) {
-    mqtt_publish_job_t *job = (mqtt_publish_job_t *)worker->user_data;
-
-    err_t err = mqtt_publish(job->state->mqttClientInst, job->topic, job->msg,
-                             job->msgLen, MQTT_PUBLISH_QOS, 0, NULL, job->state);
-    if (err != ERR_OK) {
-        DEBUG_printf("MQTT publish error %d\n", err);
-    }
-
-    free(job->msg);
-    free(job);
-}
-
-void mqtt_publish_dynamic(const char *topic, char *msg, size_t len) {
-    mqtt_publish_job_t *job = malloc(sizeof(*job));
-    if (!job) {
-        free(msg);
-        return;
-    }
-
-    job->state = mqttState;
-    strncpy(job->topic, full_topic(topic), sizeof(job->topic)-1);
-    job->topic[sizeof(job->topic)-1] = 0;
-
-    job->msg = msg;
-    job->msgLen = len;
-
-    async_at_time_worker_t worker = {
-        .do_work = mqtt_publish_worker_fn,
-        .user_data = job
-    };
-    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &worker, 0));
-}
-
-bool mqtt_publish_blocking(const char *subtopic, const uint8_t *msg, size_t len) {
-    if (!mqttState || !mqttState->connectDone)
-        return false;
-
-    const char *full = full_topic(subtopic);
-
-    cyw43_arch_lwip_begin();
-    err_t err = mqtt_publish(mqttState->mqttClientInst,
-                             full,
-                             msg,
-                             len,
-                             MQTT_PUBLISH_QOS,
-                             0,
-                             NULL,
-                             mqttState);
-    cyw43_arch_lwip_end();
-
-    return err == ERR_OK;
-}
 
 void mqtt_start(void) {
     // Use board unique id
@@ -240,11 +225,11 @@ void mqtt_start(void) {
         uniqueIdBuf[i] = tolower(uniqueIdBuf[i]);
     }
 
-    mqttState = mqtt_init();
+    mqtt_t *state = mqtt_init();
 
-    snprintf(mqttState->clientId, sizeof(mqttState->clientId), "%s-%s", MQTT_DEVICE_NAME, uniqueIdBuf);
-    mqttState->mqttClientInfo.client_id = mqttState->clientId;
+    snprintf(state->clientId, sizeof(state->clientId), "%s-%s", MQTT_DEVICE_NAME, uniqueIdBuf);
+    state->mqttClientInfo.client_id = state->clientId;
 
     hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                       &mqttState->requestWorker, 0));
+                                                       &state->requestWorker, 0));
 }

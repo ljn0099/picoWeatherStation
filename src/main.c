@@ -693,7 +693,7 @@ void core1_entry(void) {
             DEBUG_printf("%02X ", payload.msg[i]);
         DEBUG_printf("\n");
 
-        queue_add_blocking(&weatherSerializedQueue, &payload);
+        queue_try_add(&weatherSerializedQueue, &payload);
     }
 
     cyw43_arch_deinit();

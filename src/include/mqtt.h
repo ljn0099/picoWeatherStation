@@ -19,6 +19,7 @@
 
 #define DNS_RETRY_MS 5000
 #define MQTT_RETRY_MS 5000
+#define MQTT_PUBLISH_TIME_MS 5000
 
 #ifndef MQTT_TOPIC_LEN
 #define MQTT_TOPIC_LEN (sizeof(MQTT_USERNAME) + 50)
@@ -52,10 +53,6 @@ typedef struct {
 } mqtt_publish_job_t;
 
 void mqtt_start(void);
-
-void mqtt_publish_dynamic(const char *subtopic, char *msg, size_t len);
-
-bool mqtt_publish_blocking(const char *subtopic, const uint8_t *msg, size_t len);
 
 // keep alive in seconds
 #define MQTT_KEEP_ALIVE_S 60
