@@ -98,11 +98,6 @@ static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection
 }
 
 static void mqtt_start_client(mqtt_t *state) {
-    state->mqttClientInst = mqtt_client_new();
-    if (!state->mqttClientInst) {
-        panic("MQTT client instance creation error\n");
-    }
-
     INFO_printf("IP address of this device %s\n", ipaddr_ntoa(&(netif_list->ip_addr)));
     INFO_printf("Connecting to mqtt server at %s\n", ipaddr_ntoa(&state->mqttServerAddress));
 
@@ -155,6 +150,11 @@ static mqtt_t *mqtt_init() {
     mqtt_t *state = (mqtt_t *)calloc(1, sizeof(mqtt_t));
     if (!state)
         panic("failed to allocate state for mqtt\n");
+
+    state->mqttClientInst = mqtt_client_new();
+    if (!state->mqttClientInst) {
+        panic("MQTT client instance creation error\n");
+    }
 
     state->requestWorker.do_work = request_worker_fn;
     state->requestWorker.user_data = state;
