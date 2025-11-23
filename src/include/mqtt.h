@@ -55,6 +55,8 @@ void mqtt_start(void);
 
 void mqtt_publish_dynamic(const char *subtopic, char *msg, size_t len);
 
+bool mqtt_publish_blocking(const char *subtopic, const uint8_t *msg, size_t len);
+
 // keep alive in seconds
 #define MQTT_KEEP_ALIVE_S 60
 

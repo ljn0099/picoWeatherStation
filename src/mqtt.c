@@ -211,6 +211,25 @@ void mqtt_publish_dynamic(const char *topic, char *msg, size_t len) {
     hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &worker, 0));
 }
 
+bool mqtt_publish_blocking(const char *subtopic, const uint8_t *msg, size_t len) {
+    if (!mqttState || !mqttState->connectDone)
+        return false;
+
+    const char *full = full_topic(subtopic);
+
+    cyw43_arch_lwip_begin();
+    err_t err = mqtt_publish(mqttState->mqttClientInst,
+                             full,
+                             msg,
+                             len,
+                             MQTT_PUBLISH_QOS,
+                             0,
+                             NULL,
+                             mqttState);
+    cyw43_arch_lwip_end();
+
+    return err == ERR_OK;
+}
 
 void mqtt_start(void) {
     // Use board unique id
