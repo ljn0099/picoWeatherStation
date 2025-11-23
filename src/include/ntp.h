@@ -1,6 +1,11 @@
 #ifndef NTP_H
 #define NTP_H
 
+#include "lwip/dns.h"
+#include "lwip/pbuf.h"
+#include "lwip/udp.h"
+#include "pico/cyw43_arch.h"
+
 #define NTP_SERVER "ntp.roa.es"
 #define NTP_PORT 123
 #define NTP_MSG_LEN 48
