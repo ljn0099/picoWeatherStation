@@ -9,11 +9,10 @@
 #include "include/queues.h"
 #include "include/utils.h"
 
-static void ntp_result(ntp_t *state, int status, time_t *result) {
+static void ntp_result(ntp_t *state, int status, uint64_t *result) {
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->requestWorker);
     if (status == 0 && result) {
-        uint64_t epoch = (uint64_t)(*result);
         queue_try_add(&epochTimeQueue, result);
         free(state);
     }
@@ -67,16 +66,18 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
         p->tot_len == NTP_MSG_LEN && mode == 0x4 && stratum != 0) {
         uint8_t seconds_buf[4] = {0};
         pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
-        uint32_t seconds_since_1900 =
+        uint32_t seconds_buf32 =
             seconds_buf[0] << 24 | seconds_buf[1] << 16 | seconds_buf[2] << 8 | seconds_buf[3];
+
+        uint64_t seconds_since_1900 = (uint64_t)seconds_buf32;
 
         // Rollover adjustment (~2036/2037)
         if (seconds_since_1900 < NTP_DELTA) {
-            seconds_since_1900 += 0x100000000; // 2^32
+            seconds_since_1900 += 0x100000000ULL; // 2^32
         }
 
-        uint32_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA;
-        time_t epoch = (time_t)seconds_since_1970;
+        uint64_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA;
+        uint64_t epoch = (uint64_t)seconds_since_1970;
 
         ntp_result(state, 0, &epoch);
     }

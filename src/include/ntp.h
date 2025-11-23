@@ -4,7 +4,7 @@
 #define NTP_SERVER "ntp.roa.es"
 #define NTP_PORT 123
 #define NTP_MSG_LEN 48
-#define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
+#define NTP_DELTA 2208988800ULL // seconds between 1 Jan 1900 and 1 Jan 1970
 #define NTP_TEST_TIME_MS (30 * 1000)
 #define NTP_RESEND_TIME_MS (10 * 1000)
 
