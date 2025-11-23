@@ -9,8 +9,8 @@
 #include "pico/unique_id.h"
 
 #include "include/mqtt.h"
-#include "include/utils.h"
 #include "include/queues.h"
+#include "include/utils.h"
 #include "include/weather_types.h"
 
 static const char *full_topic(const char *name) {
@@ -88,8 +88,8 @@ static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection
             mqtt_publish(state->mqttClientInst, state->mqttClientInfo.will_topic, "1", 1,
                          MQTT_WILL_QOS, true, pub_request_cb, state);
         }
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+        hard_assert(async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->publishWorker, MQTT_PUBLISH_TIME_MS));
     }
     else {
         DEBUG_printf("MQTT disconnected (status %d), reconnecting...\n", status);
@@ -140,21 +140,15 @@ static void publish_worker_fn(__unused async_context_t *context, async_at_time_w
     payload_t payload;
 
     if (!queue_try_peek(&weatherSerializedQueue, &payload)) {
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                   &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+        hard_assert(async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->publishWorker, MQTT_PUBLISH_TIME_MS));
         return;
     }
 
     const char *topic = full_topic("/data");
 
-    err_t err = mqtt_publish(state->mqttClientInst,
-                             topic,
-                             payload.msg,
-                             payload.len,
-                             MQTT_PUBLISH_QOS,
-                             0,
-                             NULL,
-                             state);
+    err_t err = mqtt_publish(state->mqttClientInst, topic, payload.msg, payload.len,
+                             MQTT_PUBLISH_QOS, 0, NULL, state);
 
     if (err == ERR_OK) {
         queue_try_remove(&weatherSerializedQueue, NULL);
@@ -163,8 +157,8 @@ static void publish_worker_fn(__unused async_context_t *context, async_at_time_w
         DEBUG_printf("Error trying to publish mqtt msg\n");
     }
 
-    hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                       &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+    hard_assert(async_context_add_at_time_worker_in_ms(
+        cyw43_arch_async_context(), &state->publishWorker, MQTT_PUBLISH_TIME_MS));
 }
 
 static void request_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
@@ -214,7 +208,6 @@ static mqtt_t *mqtt_init() {
 
     return state;
 }
-
 
 void mqtt_start(void) {
     // Use board unique id

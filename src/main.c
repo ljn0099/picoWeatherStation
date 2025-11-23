@@ -16,12 +16,12 @@
 #include "sensor/ltr390.h"
 #include "sensor/pcf8523.h"
 
-#include "include/queues.h"
-#include "include/weather_types.h"
-#include "include/ntp.h"
 #include "include/mqtt.h"
+#include "include/ntp.h"
+#include "include/queues.h"
 #include "include/utils.h"
 #include "include/weather_protocol.h"
+#include "include/weather_types.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -556,7 +556,8 @@ void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *wea
             break;
 
         case SAMPLE_LTR390:
-            ltr390_sample(&weatherSensor->ltr390, &weatherAverage->lux, &weatherAverage->uvi, &weatherAverage->solarIrradiance);
+            ltr390_sample(&weatherSensor->ltr390, &weatherAverage->lux, &weatherAverage->uvi,
+                          &weatherAverage->solarIrradiance);
             break;
         }
     }
@@ -617,7 +618,8 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
 
         case COMPUTE_SOLAR_IRRADIANCE:
             avg_data_compute(&weatherAverage->solarIrradiance, &weatherFinal->solarIrradianceWm2);
-            // DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal->solarIrradianceWm2.value);
+            // DEBUG_printf("Solar irradiance: %.2f Wm/2\n",
+            // weatherFinal->solarIrradianceWm2.value);
             break;
 
         case COMPUTE_TIMESTAMP:
@@ -682,7 +684,8 @@ void core1_entry(void) {
 
         payload_t payload;
 
-        if (!create_weather_payload(&weatherFinal, payload.msg, sizeof(payload.msg), &payload.len)) {
+        if (!create_weather_payload(&weatherFinal, payload.msg, sizeof(payload.msg),
+                                    &payload.len)) {
             ERROR_printf("Error generating payload");
             continue;
         }

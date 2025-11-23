@@ -1,13 +1,13 @@
-#include <time.h>
+#include "include/ntp.h"
+#include "include/queues.h"
+#include "include/utils.h"
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
-#include "include/ntp.h"
-#include "include/queues.h"
-#include "include/utils.h"
+#include <time.h>
 
 static void ntp_result(ntp_t *state, int status, uint64_t *result) {
     async_context_remove_at_time_worker(cyw43_arch_async_context(), &state->resendWorker);
@@ -17,9 +17,8 @@ static void ntp_result(ntp_t *state, int status, uint64_t *result) {
         free(state);
     }
     else {
-        async_context_add_at_time_worker_in_ms(
-            cyw43_arch_async_context(), &state->requestWorker,
-            NTP_TEST_TIME_MS); // repeat the request in future
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &state->requestWorker,
+                                               NTP_TEST_TIME_MS); // repeat the request in future
         DEBUG_printf("Next request in %ds\n", NTP_TEST_TIME_MS / 1000);
     }
 }
