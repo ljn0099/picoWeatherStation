@@ -693,7 +693,7 @@ void core1_entry(void) {
         for (size_t i = 0; i < payloadLen; i++)
             DEBUG_printf("%02X ", payload[i]);
         DEBUG_printf("\n");
-        while (!mqtt_publish_blocking("/data", payload, sizeof(payload))) {
+        while (!mqtt_publish_blocking("/data", payload, payloadLen)) {
             DEBUG_printf("Error publishing payload\n");
             sleep_ms(1000);
         }
