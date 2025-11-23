@@ -680,24 +680,20 @@ void core1_entry(void) {
         DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal.solarIrradianceWm2.value);
         DEBUG_printf("\n");
 
-        size_t payloadLen;
-        uint8_t *payload = create_weather_payload(&weatherFinal, &payloadLen);
+        payload_t payload;
 
-        if (!payload) {
+        if (!create_weather_payload(&weatherFinal, payload.msg, sizeof(payload.msg), &payload.len)) {
             ERROR_printf("Error generating payload");
             continue;
         }
 
-        DEBUG_printf("Payload length: %zu bytes\n", payloadLen);
+        DEBUG_printf("Payload length: %zu bytes\n", payload.len);
         DEBUG_printf("Payload (hex): ");
-        for (size_t i = 0; i < payloadLen; i++)
-            DEBUG_printf("%02X ", payload[i]);
+        for (size_t i = 0; i < payload.len; i++)
+            DEBUG_printf("%02X ", payload.msg[i]);
         DEBUG_printf("\n");
-        while (!mqtt_publish_blocking("/data", payload, payloadLen)) {
-            DEBUG_printf("Error publishing payload\n");
-            sleep_ms(1000);
-        }
-        free(payload);
+
+        queue_add_blocking(&weatherSerializedQueue, &payload);
     }
 
     cyw43_arch_deinit();

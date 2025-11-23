@@ -6,6 +6,7 @@
 #define WEATHER_FINAL_QUEUE_SIZE 5
 #define WEATHER_COMPUTE_QUEUE_SIZE 16
 #define WEATHER_SAMPLE_QUEUE_SIZE 16
+#define WEATHER_SERIALIZED_QUEUE_SIZE 144
 
 #define COMPUTE_QUEUE_ADD_CMD(cmd) queue_try_add(&weatherComputeQueue, &(computeCmd_t){cmd})
 
@@ -15,6 +16,7 @@ extern queue_t weatherFinalQueue;
 extern queue_t weatherComputeQueue;
 extern queue_t weatherSampleQueue;
 extern queue_t epochTimeQueue;
+extern queue_t weatherSerializedQueue;
 
 void queues_init(void);
 

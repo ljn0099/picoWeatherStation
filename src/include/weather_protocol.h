@@ -3,8 +3,9 @@
 
 #include "include/weather_types.h"
 #include <stdint.h>
+#include <stdbool.h>
 
-// Caller must free data
-uint8_t *create_weather_payload(weatherFinal_t *data, size_t *outLen);
+bool create_weather_payload(weatherFinal_t *data, uint8_t *outBuf, size_t outBufSize,
+                            size_t *outLen);
 
 #endif

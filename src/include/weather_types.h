@@ -111,4 +111,9 @@ typedef enum {
     COMPUTE_SEND_DATA
 } computeCmd_t;
 
+typedef struct {
+    uint8_t msg[128];
+    size_t len;
+} payload_t;
+
 #endif

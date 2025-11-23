@@ -6,19 +6,21 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define ASSIGN_FLOAT_FIELD(MSG, FIELD, DATA) \
-    do {                                     \
-        if ((DATA).valid) {                  \
-            (MSG).FIELD.value = (DATA).value; \
-            (MSG).has_##FIELD = true;       \
-        } else {                             \
-            (MSG).has_##FIELD = false;      \
-        }                                    \
-    } while(0)
+#define ASSIGN_FLOAT_FIELD(MSG, FIELD, DATA)                                                       \
+    do {                                                                                           \
+        if ((DATA).valid) {                                                                        \
+            (MSG).FIELD.value = (DATA).value;                                                      \
+            (MSG).has_##FIELD = true;                                                              \
+        }                                                                                          \
+        else {                                                                                     \
+            (MSG).has_##FIELD = false;                                                             \
+        }                                                                                          \
+    } while (0)
 
-uint8_t *create_weather_payload(weatherFinal_t *data, size_t *outLen) {
-    if (!data || !outLen)
-        return NULL;
+bool create_weather_payload(weatherFinal_t *data, uint8_t *outBuf, size_t outBufSize,
+                            size_t *outLen) {
+    if (!data || !outBuf || !outLen)
+        return false;
 
     weather_WeatherMeasurement meas = weather_WeatherMeasurement_init_zero;
     meas.periodStart = data->epochTimeStart;
@@ -36,23 +38,22 @@ uint8_t *create_weather_payload(weatherFinal_t *data, size_t *outLen) {
     ASSIGN_FLOAT_FIELD(meas, rainfall, data->rainfallMM);
     ASSIGN_FLOAT_FIELD(meas, solarIrradiance, data->solarIrradianceWm2);
 
-    // Get buffer size
-    size_t payloadLen;
-    if (!pb_get_encoded_size(&payloadLen, weather_WeatherMeasurement_fields, &meas))
-        return NULL;
+    size_t estimatedSize;
 
-    uint8_t *buffer = malloc(payloadLen);
-    if (!buffer)
-        return NULL;
-
-    // Codificar
-    pb_ostream_t stream = pb_ostream_from_buffer(buffer, payloadLen);
-    if (!pb_encode(&stream, weather_WeatherMeasurement_fields, &meas)) {
-        free(buffer);
-        return NULL;
+    if (!pb_get_encoded_size(&estimatedSize, weather_WeatherMeasurement_fields, &meas)) {
+        return false;
     }
 
-    *outLen = payloadLen;
-    // Caller must call free
-    return buffer;
+    if (estimatedSize > outBufSize)
+        return false;
+
+    pb_ostream_t stream = pb_ostream_from_buffer(outBuf, outBufSize);
+
+    if (!pb_encode(&stream, weather_WeatherMeasurement_fields, &meas)) {
+        return false;
+    }
+
+    *outLen = stream.bytes_written;
+
+    return true;
 }
