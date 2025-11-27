@@ -15,7 +15,7 @@
 #define DNS_SERVER "1.1.1.1"
 #define DNS_SERVER_ALT "1.0.0.1"
 
-// TODO: max attempts to retry, do multiple ntp readings
+// TODO: do multiple ntp readings
 
 typedef struct {
     ip_addr_t ntpServerAddress;
@@ -24,6 +24,7 @@ typedef struct {
     async_at_time_worker_t resendWorker;
     struct timespec t0;
     bool requestPending;
+    uint32_t attempts;
 } ntp_t;
 
 typedef enum {
@@ -54,6 +55,8 @@ typedef struct {
 
 #define NS_PER_SEC 1000000000ULL
 #define NS_PER_MS 1000000LL
+
+#define NTP_MAX_ATTEMPTS 5
 
 #define NTP_FRAC_TO_NS(frac) ((uint32_t)((((uint64_t)(frac)) * NS_PER_SEC) >> 32))
 
@@ -111,17 +114,24 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
     state->requestPending = false;
 
     if (status == 0 && offset) {
+        state->attempts = 0;
         printf("Got offset\n");
         msg.alert = NTP_SUCCESS;
         msg.offset = *offset;
         queue_try_add(&timeResultQueue, &msg);
+        return;
     }
-    else {
+
+    // Failure
+    state->attempts++;
+
+    if (state->attempts >= NTP_MAX_ATTEMPTS) {
         msg.alert = NTP_FAILURE;
         msg.offset.tv_sec = 0;
         msg.offset.tv_nsec = 0;
         queue_try_add(&timeResultQueue, &msg);
-
+    }
+    else {
         hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
                                                            &state->requestWorker, NTP_RETRY_TIME_MS));
         printf("Next request in %ds\n", (NTP_RETRY_TIME_MS / 1000));
@@ -376,6 +386,8 @@ static ntp_t *ntp_init(void) {
     state->requestWorker.user_data = state;
     state->resendWorker.do_work = resend_worker_fn;
     state->resendWorker.user_data = state;
+    state->requestPending = false;
+    state->attempts = 0;
     return state;
 }
 
