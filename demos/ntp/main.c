@@ -15,8 +15,6 @@
 #define DNS_SERVER "1.1.1.1"
 #define DNS_SERVER_ALT "1.0.0.1"
 
-// TODO: do multiple ntp readings
-
 typedef struct {
     ip_addr_t ntpServerAddress;
     struct udp_pcb *ntpPcb;
