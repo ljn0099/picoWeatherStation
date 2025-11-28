@@ -75,10 +75,15 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
     state->attempts++;
 
     if (state->attempts >= NTP_MAX_ATTEMPTS) {
+        state->attempts = 0;
         msg.alert = NTP_FAILURE;
         msg.offset.tv_sec = 0;
         msg.offset.tv_nsec = 0;
         queue_try_add(&timeResultQueue, &msg);
+    }
+    else {
+        time_request_t req = NTP_REQUEST;
+        queue_try_add(&timeRequestQueue, &req);
     }
 }
 

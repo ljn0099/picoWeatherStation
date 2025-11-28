@@ -113,7 +113,7 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
 
     if (status == 0 && offset) {
         state->attempts = 0;
-        printf("Got offset\n");
+        DEBUG_printf("Got offset\n");
         msg.alert = NTP_SUCCESS;
         msg.offset = *offset;
         queue_try_add(&timeResultQueue, &msg);
@@ -124,12 +124,18 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
     state->attempts++;
 
     if (state->attempts >= NTP_MAX_ATTEMPTS) {
+        state->attempts = 0;
         msg.alert = NTP_FAILURE;
         msg.offset.tv_sec = 0;
         msg.offset.tv_nsec = 0;
         queue_try_add(&timeResultQueue, &msg);
     }
+    else {
+        time_request_t req = NTP_REQUEST;
+        queue_try_add(&timeRequestQueue, &req);
+    }
 }
+
 
 static void ntp_request(ntp_t *state) {
     cyw43_arch_lwip_begin();

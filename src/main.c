@@ -463,6 +463,44 @@ uint64_t aon_get_epoch() {
     return ts.tv_sec;
 }
 
+void sync_time(time_msg_t msg, pcf8523_t *pcf8523) {
+    if (msg.alert == NTP_SUCCESS) {
+        // Set new time
+        struct timespec localTime;
+        if (!aon_timer_get_time(&localTime)) {
+            panic("Error getting time from aon");
+        }
+        ntp_apply_offset_timespec(&localTime, &msg.offset);
+        if (!aon_timer_set_time(&localTime)) {
+            panic("Error setting aon");
+        }
+
+        // Set the time to the rtc
+        if (!pcf8523_set(pcf8523, localTime.tv_sec)) {
+            panic("Error setting pcf8523 time");
+        }
+
+        // Print actual time
+        struct tm tm;
+        aon_timer_get_time_calendar(&tm);
+        print_struct_tm(&tm);
+    }
+    else {
+        // Get time from rtc
+        uint64_t epoch;
+        pcf8523_get_epoch(pcf8523, &epoch);
+
+        struct timespec localTime;
+        localTime.tv_sec = epoch;
+        localTime.tv_nsec = 0;
+
+        // Set the time from the rtc to the aon
+        if (!aon_timer_set_time(&localTime)) {
+            panic("Error setting aon");
+        }
+    }
+}
+
 int main(void) {
     stdio_init_all();
 
@@ -477,7 +515,8 @@ int main(void) {
     ts.tv_sec = 0;
     ts.tv_nsec = 0;
 
-    aon_timer_start(&ts);
+    if (!aon_timer_start(&ts))
+        panic("Error initializing aon");
 
     // Queue
     queues_init();
@@ -505,41 +544,18 @@ int main(void) {
         panic("Error initializing pcf8523");
     }
 
+    // Sync the time
+
+    // Make the request
     time_request_t req = NTP_REQUEST;
-    queue_try_add(&timeRequestQueue, &req);
+    queue_add_blocking(&timeRequestQueue, &req);
 
+
+    // Wait for the request
     time_msg_t msg;
-
     queue_remove_blocking(&timeResultQueue, &msg);
 
-    if (msg.alert == NTP_SUCCESS) {
-        // Set new time
-        struct timespec localTime;
-        aon_timer_get_time(&localTime);
-        ntp_apply_offset_timespec(&localTime, &msg.offset);
-        aon_timer_set_time(&localTime);
-
-        // Set the time to the rtc
-        if (!pcf8523_set(&weatherSensor.pcf8523, localTime.tv_sec)) {
-            panic("Error setting pcf8523 time");
-        }
-
-        // Print actual time
-        struct tm tm;
-        aon_timer_get_time_calendar(&tm);
-        print_struct_tm(&tm);
-    }
-    else {
-        uint64_t epoch;
-        pcf8523_get_epoch(&weatherSensor.pcf8523, &epoch);
-
-        struct timespec localTime;
-        localTime.tv_sec = epoch;
-        localTime.tv_nsec = 0;
-
-        aon_timer_set_time(&localTime);
-    }
-
+    sync_time(msg, &weatherSensor.pcf8523);
 
     // HDC3022
     hdc3022_init(&weatherSensor.hdc3022);
@@ -569,10 +585,14 @@ int main(void) {
         panic("Error creating timer");
     }
 
+    time_msg_t timeMsg;
+
     // Main loop
     while (1) {
         process_sample_queue(&weatherAverage, &weatherSensor);
         process_compute_queue(&weatherAverage, &weatherFinal, &weatherSensor);
+        if (queue_try_remove(&timeResultQueue, &timeMsg))
+            sync_time(timeMsg, &weatherSensor.pcf8523);
         // watchdog_update();
     }
 
