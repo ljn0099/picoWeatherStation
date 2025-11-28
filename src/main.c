@@ -84,6 +84,8 @@
 #define WIND_VANE_TOLERANCE_V 0.05f
 #define WIND_VANE_TOLERANCE_ADC (VOLT_TO_ADC(WIND_VANE_TOLERANCE_V))
 
+#define WIFI_RECONNECT_MAX 15
+
 typedef struct {
     uint16_t adcValue;
     float directionRad;
@@ -725,12 +727,11 @@ void core1_entry(void) {
         panic("Failed to init cyw43");
     }
 
+    uint32_t wifiAttempts = 0;
+
     cyw43_arch_enable_sta_mode();
 
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK,
-                                           30000)) {
-        panic("Failed to connect to the wifi");
-    }
+    cyw43_arch_wifi_connect_async(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
 
     mbedtls_platform_set_time(mbedtls_get_time);
 
@@ -754,6 +755,19 @@ void core1_entry(void) {
     weatherFinal_t weatherFinal = {0};
     while (1) {
         queue_remove_blocking(&weatherFinalQueue, &weatherFinal);
+
+        if (cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_JOIN) {
+            wifiAttempts = 0;
+        }
+        else {
+            cyw43_arch_wifi_connect_async(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
+            wifiAttempts++;
+        }
+
+        if (wifiAttempts >= WIFI_RECONNECT_MAX)
+            panic("To much wifi failed attempts");
+
+
         DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTimeStart);
         DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTimeEnd);
         DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
