@@ -2,16 +2,16 @@
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/watchdog.h"
+#include "pico/aon_timer.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
-#include "pico/aon_timer.h"
 
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
-#include "pico/cyw43_arch.h"
 #include "mbedtls/platform_time.h"
+#include "pico/cyw43_arch.h"
 
 #include "sensor/dps310.h"
 #include "sensor/hdc3022.h"
@@ -556,7 +556,6 @@ int main(void) {
     time_request_t req = NTP_REQUEST;
     queue_add_blocking(&timeRequestQueue, &req);
 
-
     // Wait for the request
     time_msg_t msg;
     queue_remove_blocking(&timeResultQueue, &msg);
@@ -766,7 +765,6 @@ void core1_entry(void) {
 
         if (wifiAttempts >= WIFI_RECONNECT_MAX)
             panic("To much wifi failed attempts");
-
 
         DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTimeStart);
         DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTimeEnd);

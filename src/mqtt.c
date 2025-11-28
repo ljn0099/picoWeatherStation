@@ -1,7 +1,7 @@
+#include "lwip/apps/mqtt.h"
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
 #include "lwip/altcp_tls.h"
-#include "lwip/apps/mqtt.h"
 #include "lwip/apps/mqtt_priv.h" // needed to set hostname
 #include "lwip/dns.h"
 #include "pico/cyw43_arch.h"

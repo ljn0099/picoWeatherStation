@@ -11,10 +11,10 @@
 #include "pico/aon_timer.h"
 #include "pico/util/queue.h"
 
-#include "include/queues.h"
-#include "include/weather_types.h"
 #include "include/ntp.h"
+#include "include/queues.h"
 #include "include/utils.h"
+#include "include/weather_types.h"
 
 #define NTP_MSG_LEN 48
 
@@ -303,12 +303,12 @@ static void request_worker_fn(__unused async_context_t *context, async_at_time_w
     }
 
     hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                   &state->requestWorker, NTP_CHECK_QUEUE_MS));
+                                                       &state->requestWorker, NTP_CHECK_QUEUE_MS));
     return;
 
 retry:
     hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                   &state->requestWorker, NTP_CHECK_QUEUE_MS));
+                                                       &state->requestWorker, NTP_CHECK_QUEUE_MS));
     return;
 }
 

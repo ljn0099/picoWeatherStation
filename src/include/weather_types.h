@@ -117,14 +117,9 @@ typedef struct {
     size_t len;
 } payload_t;
 
-typedef enum {
-    NTP_SUCCESS,
-    NTP_FAILURE
-} time_alert_t;
+typedef enum { NTP_SUCCESS, NTP_FAILURE } time_alert_t;
 
-typedef enum {
-    NTP_REQUEST
-} time_request_t;
+typedef enum { NTP_REQUEST } time_request_t;
 
 typedef struct {
     time_alert_t alert;
