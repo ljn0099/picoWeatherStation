@@ -191,6 +191,7 @@ static inline void peak_wind_update(windDirection_t *windDirection) {
 
 static inline void peak_wind_compute(finalData_t *peakSpeed, finalData_t *peakDirection) {
     peakSpeed->value = get_wind_speed_kmh(weatherIrq.peakWind.peakInterrupts, SAMPLE_INTERVAL_S);
+    peakSpeed->valid = true;
     if (weatherIrq.peakWind.peakDirectionRad >= 0.0f) {
         peakDirection->value = RAD_TO_DEG(weatherIrq.peakWind.peakDirectionRad);
         peakDirection->valid = true;
