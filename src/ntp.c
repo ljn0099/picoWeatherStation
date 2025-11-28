@@ -14,6 +14,7 @@
 #include "include/queues.h"
 #include "include/weather_types.h"
 #include "include/ntp.h"
+#include "include/utils.h"
 
 #define NTP_MSG_LEN 48
 
@@ -63,7 +64,7 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
 
     if (status == 0 && offset) {
         state->attempts = 0;
-        printf("Got offset\n");
+        DEBUG_printf("Got offset\n");
         msg.alert = NTP_SUCCESS;
         msg.offset = *offset;
         queue_try_add(&timeResultQueue, &msg);
@@ -78,11 +79,6 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
         msg.offset.tv_sec = 0;
         msg.offset.tv_nsec = 0;
         queue_try_add(&timeResultQueue, &msg);
-    }
-    else {
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, NTP_RETRY_TIME_MS));
-        printf("Next request in %ds\n", (NTP_RETRY_TIME_MS / 1000));
     }
 }
 
@@ -104,11 +100,11 @@ static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *a
     ntp_t *state = (ntp_t *)arg;
     if (ipaddr) {
         state->ntpServerAddress = *ipaddr;
-        printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
+        DEBUG_printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
         ntp_request(state);
     }
     else {
-        printf("ntp dns request failed\n");
+        DEBUG_printf("ntp dns request failed\n");
         ntp_result(state, -1, NULL);
     }
 }
@@ -216,32 +212,32 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
     uint8_t leapIndicator = ntp_read_leap_indicator(p);
 
     if (!ip_addr_cmp(addr, &state->ntpServerAddress)) {
-        printf("invalid ntp response: wrong address\n");
+        DEBUG_printf("invalid ntp response: wrong address\n");
         goto fail;
     }
 
     if (port != NTP_PORT) {
-        printf("invalid ntp response: wrong port\n");
+        DEBUG_printf("invalid ntp response: wrong port\n");
         goto fail;
     }
 
     if (p->tot_len != NTP_MSG_LEN) {
-        printf("invalid ntp response: wrong length\n");
+        DEBUG_printf("invalid ntp response: wrong length\n");
         goto fail;
     }
 
     if (mode != 4) {
-        printf("invalid ntp response: wrong mode\n");
+        DEBUG_printf("invalid ntp response: wrong mode\n");
         goto fail;
     }
 
     if (stratum == 0 || stratum >= 16) {
-        printf("invalid ntp response: wrong stratum\n");
+        DEBUG_printf("invalid ntp response: wrong stratum\n");
         goto fail;
     }
 
     if (leapIndicator == 3) {
-        printf("invalid ntp response: server unsynchronized\n");
+        DEBUG_printf("invalid ntp response: server unsynchronized\n");
         goto fail;
     }
 
@@ -262,7 +258,7 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
 
     int64_t rttNs = ntp_calculate_rtt(&state->t0, &t1, &t2, &t3);
     if (rttNs > (NTP_RTT_MAX_MS * NS_PER_MS)) { // 200 ms
-        printf("NTP response round-trip too high: %lld ms\n", rttNs / NS_PER_MS);
+        DEBUG_printf("NTP response round-trip too high: %lld ms\n", rttNs / NS_PER_MS);
         goto fail;
     }
 
@@ -297,7 +293,7 @@ static void request_worker_fn(__unused async_context_t *context, async_at_time_w
         ntp_request(state);
     }
     else if (err != ERR_INPROGRESS) {
-        printf("dns request failed\n");
+        DEBUG_printf("dns request failed\n");
         ntp_result(state, -1, NULL);
     }
 
@@ -313,19 +309,19 @@ retry:
 
 static void resend_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
     ntp_t *state = (ntp_t *)worker->user_data;
-    printf("ntp request failed\n");
+    DEBUG_printf("ntp request failed\n");
     ntp_result(state, -1, NULL);
 }
 
 static ntp_t *ntp_init(void) {
     ntp_t *state = (ntp_t *)calloc(1, sizeof(ntp_t));
     if (!state) {
-        printf("failed to allocate state\n");
+        DEBUG_printf("failed to allocate state\n");
         return NULL;
     }
     state->ntpPcb = udp_new_ip_type(IPADDR_TYPE_ANY);
     if (!state->ntpPcb) {
-        printf("failed to create pcb\n");
+        DEBUG_printf("failed to create pcb\n");
         free(state);
         return NULL;
     }

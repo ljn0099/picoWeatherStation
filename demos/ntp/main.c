@@ -129,11 +129,6 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
         msg.offset.tv_nsec = 0;
         queue_try_add(&timeResultQueue, &msg);
     }
-    else {
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, NTP_RETRY_TIME_MS));
-        printf("Next request in %ds\n", (NTP_RETRY_TIME_MS / 1000));
-    }
 }
 
 static void ntp_request(ntp_t *state) {

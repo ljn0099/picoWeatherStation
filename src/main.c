@@ -448,6 +448,21 @@ void pcf8523_get_epoch(pcf8523_t *pcf8523, uint64_t *epochTime) {
     *epochTime = pcf8523_datetime_to_epoch(&datetime, BASE_CENTURY);
 }
 
+void print_struct_tm(const struct tm *timeinfo) {
+    if (!timeinfo)
+        return;
+
+    printf("%04d-%02d-%02d %02d:%02d:%02d\n", timeinfo->tm_year + 1900, timeinfo->tm_mon + 1,
+           timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+}
+
+uint64_t aon_get_epoch() {
+    struct timespec ts;
+    if (!aon_timer_get_time(&ts))
+        panic("Error getting time from aon");
+    return ts.tv_sec;
+}
+
 int main(void) {
     stdio_init_all();
 
@@ -490,12 +505,41 @@ int main(void) {
         panic("Error initializing pcf8523");
     }
 
-    uint64_t epochTime;
-    queue_remove_blocking(&epochTimeQueue, &epochTime);
+    time_request_t req = NTP_REQUEST;
+    queue_try_add(&timeRequestQueue, &req);
 
-    if (!pcf8523_set(&weatherSensor.pcf8523, epochTime)) {
-        panic("Error setting pcf8523 time");
+    time_msg_t msg;
+
+    queue_remove_blocking(&timeResultQueue, &msg);
+
+    if (msg.alert == NTP_SUCCESS) {
+        // Set new time
+        struct timespec localTime;
+        aon_timer_get_time(&localTime);
+        ntp_apply_offset_timespec(&localTime, &msg.offset);
+        aon_timer_set_time(&localTime);
+
+        // Set the time to the rtc
+        if (!pcf8523_set(&weatherSensor.pcf8523, localTime.tv_sec)) {
+            panic("Error setting pcf8523 time");
+        }
+
+        // Print actual time
+        struct tm tm;
+        aon_timer_get_time_calendar(&tm);
+        print_struct_tm(&tm);
     }
+    else {
+        uint64_t epoch;
+        pcf8523_get_epoch(&weatherSensor.pcf8523, &epoch);
+
+        struct timespec localTime;
+        localTime.tv_sec = epoch;
+        localTime.tv_nsec = 0;
+
+        aon_timer_set_time(&localTime);
+    }
+
 
     // HDC3022
     hdc3022_init(&weatherSensor.hdc3022);
@@ -631,7 +675,7 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
             break;
 
         case COMPUTE_TIMESTAMP:
-            pcf8523_get_epoch(&weatherSensor->pcf8523, &weatherFinal->epochTimeEnd);
+            weatherFinal->epochTimeEnd = aon_get_epoch();
             weatherFinal->epochTimeStart = weatherFinal->epochTimeEnd - COMPUTE_INTERVAL_S;
             break;
 
@@ -668,7 +712,7 @@ void core1_entry(void) {
     dns_setserver(0, &dns1);
     dns_setserver(1, &dns2);
 
-    ntp_start_request();
+    ntp_start();
 
     mqtt_start();
 
