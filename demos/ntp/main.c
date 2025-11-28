@@ -113,7 +113,7 @@ static void ntp_result(ntp_t *state, int status, struct timespec *offset) {
 
     if (status == 0 && offset) {
         state->attempts = 0;
-        DEBUG_printf("Got offset\n");
+        printf("Got offset\n");
         msg.alert = NTP_SUCCESS;
         msg.offset = *offset;
         queue_try_add(&timeResultQueue, &msg);
