@@ -3,7 +3,7 @@
 
 // Need more memory for TLS
 #ifdef MQTT_CERT_INC
-#define MEM_SIZE 8000
+#define MEM_SIZE 16384
 #endif
 // Common settings
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
