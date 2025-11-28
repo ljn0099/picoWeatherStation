@@ -11,6 +11,7 @@
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 #include "pico/cyw43_arch.h"
+#include "mbedtls/platform_time.h"
 
 #include "sensor/dps310.h"
 #include "sensor/hdc3022.h"
@@ -502,6 +503,8 @@ void sync_time(time_msg_t msg, pcf8523_t *pcf8523) {
     }
 }
 
+bool timeSyncedBoot = false;
+
 int main(void) {
     stdio_init_all();
 
@@ -557,6 +560,7 @@ int main(void) {
     queue_remove_blocking(&timeResultQueue, &msg);
 
     sync_time(msg, &weatherSensor.pcf8523);
+    timeSyncedBoot = true;
 
     // HDC3022
     hdc3022_init(&weatherSensor.hdc3022);
@@ -709,6 +713,10 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
     }
 }
 
+mbedtls_time_t mbedtls_get_time(mbedtls_time_t *t) {
+    return aon_get_epoch();
+}
+
 void core1_entry(void) {
     DEBUG_printf("Hello from core 1 :)\n");
 
@@ -724,6 +732,8 @@ void core1_entry(void) {
         panic("Failed to connect to the wifi");
     }
 
+    mbedtls_platform_set_time(mbedtls_get_time);
+
     // Set dns servers
     ip_addr_t dns1, dns2;
 
@@ -734,6 +744,10 @@ void core1_entry(void) {
     dns_setserver(1, &dns2);
 
     ntp_start();
+
+    while (!timeSyncedBoot) {
+        tight_loop_contents();
+    }
 
     mqtt_start();
 
