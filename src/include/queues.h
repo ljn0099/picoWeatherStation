@@ -15,8 +15,9 @@
 extern queue_t weatherFinalQueue;
 extern queue_t weatherComputeQueue;
 extern queue_t weatherSampleQueue;
-extern queue_t epochTimeQueue;
 extern queue_t weatherSerializedQueue;
+extern queue_t timeResultQueue;
+extern queue_t timeRequestQueue;
 
 void queues_init(void);
 

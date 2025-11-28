@@ -6,6 +6,7 @@
 #include "sensor/ltr390.h"
 #include "sensor/pcf8523.h"
 #include <stdbool.h>
+#include <time.h>
 
 typedef struct {
     float value;
@@ -115,5 +116,19 @@ typedef struct {
     uint8_t msg[128];
     size_t len;
 } payload_t;
+
+typedef enum {
+    NTP_SUCCESS,
+    NTP_FAILURE
+} time_alert_t;
+
+typedef enum {
+    NTP_REQUEST
+} time_request_t;
+
+typedef struct {
+    time_alert_t alert;
+    struct timespec offset;
+} time_msg_t;
 
 #endif

@@ -5,6 +5,7 @@
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
+#include "pico/aon_timer.h"
 
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
@@ -455,6 +456,13 @@ int main(void) {
     weatherAverage_t weatherAverage = {0};
     weatherFinal_t weatherFinal = {0};
     weatherSensor_t weatherSensor = {0};
+
+    // Start aon timer
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 0;
+
+    aon_timer_start(&ts);
 
     // Queue
     queues_init();

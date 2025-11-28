@@ -117,6 +117,7 @@ target_link_libraries(picoWeatherStation
     pico_lwip_mqtt
     pico_mbedtls
     pico_lwip_mbedtls
+    pico_aon_timer
 )
 
 # Pico platform settings
