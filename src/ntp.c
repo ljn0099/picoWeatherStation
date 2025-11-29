@@ -18,13 +18,13 @@
 
 #define NTP_MSG_LEN 48
 
-#define NTP_DELTA 2208988800ULL // seconds between 1 Jan 1900 and 1 Jan 1970
+#define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
 #define NTP_ERA_SECONDS (1ULL << 32)
 
 #define NTP_CURRENT_ERA_BASE ((NTP_CURRENT_ERA * NTP_ERA_SECONDS) + NTP_DELTA)
 
-#define NS_PER_SEC 1000000000ULL
-#define NS_PER_MS 1000000LL
+#define NS_PER_SEC 1000000000
+#define NS_PER_MS 1000000
 
 #define NTP_FRAC_TO_NS(frac) ((uint32_t)((((uint64_t)(frac)) * NS_PER_SEC) >> 32))
 

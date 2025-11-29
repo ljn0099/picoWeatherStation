@@ -10,7 +10,7 @@
 #define NTP_SERVER "ntp.roa.es"
 #define NTP_PORT 123
 
-#define NTP_CURRENT_ERA 0U
+#define NTP_CURRENT_ERA 0
 
 #define NTP_RTT_MAX_MS 200
 #define NTP_MAX_ATTEMPTS 5
