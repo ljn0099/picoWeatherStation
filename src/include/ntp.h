@@ -15,11 +15,8 @@
 #define NTP_RTT_MAX_MS 200
 #define NTP_MAX_ATTEMPTS 5
 
-#define NTP_RETRY_TIME_MS (15 * 1000)
-#define NTP_RESEND_TIME_MS (10 * 1000)
-#define NTP_CHECK_QUEUE_MS (7 * 1000)
-
-#define NTP_TEST_TIME_MS (30 * 1000)
+#define NTP_RESEND_TIME_MS (15 * 1000)
+#define NTP_CHECK_QUEUE_MS (17 * 1000)
 
 typedef struct {
     ip_addr_t ntpServerAddress;
