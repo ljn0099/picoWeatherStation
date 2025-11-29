@@ -109,7 +109,8 @@ typedef enum {
     COMPUTE_RAINFALL,
     COMPUTE_SOLAR_IRRADIANCE,
     COMPUTE_TIMESTAMP,
-    COMPUTE_SEND_DATA
+    COMPUTE_SEND_DATA,
+    COMPUTE_TIME_SEND_REQ
 } computeCmd_t;
 
 typedef struct {

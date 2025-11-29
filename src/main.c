@@ -65,6 +65,7 @@
 #define COMPUTE_INTERVAL_S (COMPUTE_INTERVAL_MS / 1000)
 
 #define WATCHDOG_INTERVAL_MS 1000
+#define TIME_RESYNC_INTERVAL_S (6 * 3600) // 6 hours
 
 // Sensor GPIOs
 #define RAIN_GAUGE_PIN 21
@@ -505,6 +506,31 @@ void sync_time(time_msg_t msg, pcf8523_t *pcf8523) {
     }
 }
 
+void my_alarm_handler(void) {
+    DEBUG_printf("Hello from the alarm callback\n");
+    time_request_t req = NTP_REQUEST;
+    queue_try_add(&timeRequestQueue, &req);
+    computeCmd_t cmd = COMPUTE_TIME_SEND_REQ;
+    queue_try_add(&weatherComputeQueue, &cmd);
+}
+
+void add_new_alarm() {
+    struct timespec localTime;
+    if (!aon_timer_get_time(&localTime)) {
+        panic("Error getting time from aon");
+    }
+
+    localTime.tv_sec += TIME_RESYNC_INTERVAL_S;
+    localTime.tv_nsec = 0;
+
+    aon_timer_alarm_handler_t oldCb;
+
+    oldCb = aon_timer_enable_alarm(&localTime, my_alarm_handler, true);
+    if ((uintptr_t)oldCb == PICO_ERROR_INVALID_ARG) {
+        panic("Error setting alarm timer");
+    }
+}
+
 bool timeSyncedBoot = false;
 
 int main(void) {
@@ -562,6 +588,8 @@ int main(void) {
 
     sync_time(msg, &weatherSensor.pcf8523);
     timeSyncedBoot = true;
+
+    add_new_alarm();
 
     // HDC3022
     hdc3022_init(&weatherSensor.hdc3022);
@@ -709,6 +737,9 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
             if (!queue_try_add(&weatherFinalQueue, weatherFinal))
                 DEBUG_printf("Final weather queue full\n");
             *weatherFinal = (weatherFinal_t){0};
+            break;
+        case COMPUTE_TIME_SEND_REQ:
+            add_new_alarm();
             break;
         }
     }
