@@ -64,7 +64,7 @@
 #define SAMPLE_INTERVAL_S (SAMPLE_INTERVAL_MS / 1000)
 #define COMPUTE_INTERVAL_S (COMPUTE_INTERVAL_MS / 1000)
 
-#define WATCHDOG_INTERVAL_MS 1000
+#define WATCHDOG_INTERVAL_MS 5000
 #define TIME_RESYNC_INTERVAL_S (6 * 3600) // 6 hours
 
 // Sensor GPIOs
@@ -538,9 +538,20 @@ int main(void) {
 
     DEBUG_printf("Hello :)\n");
 
+#ifdef NDEBUG
+    watchdog_enable(WATCHDOG_INTERVAL_MS, true);
+#else
+    watchdog_enable(WATCHDOG_INTERVAL_MS, false);
+#endif
+
     weatherAverage_t weatherAverage = {0};
     weatherFinal_t weatherFinal = {0};
     weatherSensor_t weatherSensor = {0};
+
+    if (watchdog_enable_caused_reboot())
+        DEBUG_printf("Rebooted by watchdog\n");
+    else
+        DEBUG_printf("Clean boot\n");
 
     // Start aon timer
     struct timespec ts;
@@ -550,19 +561,29 @@ int main(void) {
     if (!aon_timer_start(&ts))
         panic("Error initializing aon");
 
+    watchdog_update();
+
     // Queue
     queues_init();
 
+    watchdog_update();
+
     // Init core 1
     multicore_launch_core1(core1_entry);
+
+    watchdog_update();
 
     // Rain gauge
     gpio_init(RAIN_GAUGE_PIN);
     gpio_set_dir(RAIN_GAUGE_PIN, GPIO_IN);
 
+    watchdog_update();
+
     // Anemometer
     gpio_init(ANEMOMETER_PIN);
     gpio_set_dir(ANEMOMETER_PIN, GPIO_IN);
+
+    watchdog_update();
 
     // I2C
     i2c_init(I2C_BUS, I2C_SPEED);
@@ -571,39 +592,65 @@ int main(void) {
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
 
+    watchdog_update();
+
     // RTC
     if (!pcf8523_init(&weatherSensor.pcf8523)) {
         panic("Error initializing pcf8523");
     }
 
+    watchdog_update();
+
     // Sync the time
 
     // Make the request
     time_request_t req = NTP_REQUEST;
-    queue_add_blocking(&timeRequestQueue, &req);
+    queue_try_add(&timeRequestQueue, &req);
 
     // Wait for the request
+    uint32_t syncAttempts = 0;
     time_msg_t msg;
-    queue_remove_blocking(&timeResultQueue, &msg);
+    while (!queue_try_remove(&timeResultQueue, &msg)) {
+        watchdog_update();
+        syncAttempts++;
+        if (syncAttempts >= 10)
+            panic("Error syncing time");
+        sleep_ms(WATCHDOG_INTERVAL_MS-500);
+    }
+
+    watchdog_update();
 
     sync_time(msg, &weatherSensor.pcf8523);
+
+    watchdog_update();
+
     timeSyncedBoot = true;
 
     add_new_alarm();
 
+    watchdog_update();
+
     // HDC3022
     hdc3022_init(&weatherSensor.hdc3022);
+
+    watchdog_update();
 
     // DPS310
     dps310_init(&weatherSensor.dps310);
 
+    watchdog_update();
+
     // LTR390
     ltr390_init(&weatherSensor.ltr390);
+
+    watchdog_update();
 
     // Wind vane
     adc_init();
     adc_gpio_init(WIND_VANE_PIN);
     adc_select_input(WIND_VANE_ADC_CHANNEL);
+
+    watchdog_update();
 
     // IRQ
     gpio_set_irq_enabled_with_callback(RAIN_GAUGE_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
@@ -614,10 +661,13 @@ int main(void) {
     if (!add_repeating_timer_ms(-COMPUTE_INTERVAL_MS, compute_callback, NULL, &computeTimer)) {
         panic("Error creating timer");
     }
+
     struct repeating_timer sampleTimer;
     if (!add_repeating_timer_ms(-SAMPLE_INTERVAL_MS, sample_callback, NULL, &sampleTimer)) {
         panic("Error creating timer");
     }
+
+    watchdog_update();
 
     time_msg_t timeMsg;
 
@@ -627,7 +677,7 @@ int main(void) {
         process_compute_queue(&weatherAverage, &weatherFinal, &weatherSensor);
         if (queue_try_remove(&timeResultQueue, &timeMsg))
             sync_time(timeMsg, &weatherSensor.pcf8523);
-        // watchdog_update();
+        watchdog_update();
     }
 
     gpio_set_irq_enabled(RAIN_GAUGE_PIN, GPIO_IRQ_EDGE_FALL, false);
