@@ -35,10 +35,15 @@
 #define DNS_SERVER_ALT "1.0.0.1"
 
 // I2C Config
-#define I2C_BUS i2c0
-#define I2C_SDA 16
-#define I2C_SCL 17
+#define I2C_BUS i2c1
+#define I2C_SDA 18
+#define I2C_SCL 19
 #define I2C_SPEED 100000 // 100kHz
+
+#define I2C_PCF_BUS i2c0
+#define I2C_PCF_SDA 16
+#define I2C_PCF_SCL 17
+#define I2C_PCF_SPEED 100000 // 100kHz
 
 // I2C Addresses
 #define HDC3022_ADDRESS 0x44
@@ -362,7 +367,7 @@ bool ltr390_init(ltr390_t *ltr390) {
 }
 
 bool pcf8523_init(pcf8523_t *pcf8523) {
-    if (!pcf8523_init_struct(pcf8523, I2C_BUS, PCF8523_ADDRESS, true, false)) {
+    if (!pcf8523_init_struct(pcf8523, I2C_PCF_BUS, PCF8523_ADDRESS, true, false)) {
         ERROR_printf("Error initializating the pcf8523 struct\n");
         return false;
     }
@@ -591,6 +596,13 @@ int main(void) {
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
+
+    i2c_init(I2C_PCF_BUS, I2C_PCF_SPEED);
+    gpio_set_function(I2C_PCF_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(I2C_PCF_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(I2C_PCF_SDA);
+    gpio_pull_up(I2C_PCF_SCL);
+
 
     watchdog_update();
 
