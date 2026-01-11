@@ -44,6 +44,7 @@ typedef struct {
     bool weatherDataOnFly;
     async_at_time_worker_t requestWorker;
     async_at_time_worker_t publishWorker;
+    async_at_time_worker_t publishWorkerReqFallback;
 } mqtt_t;
 
 typedef struct {

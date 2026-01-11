@@ -134,8 +134,15 @@ static void mqtt_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *
     }
 }
 
+static void publish_worker_request_fallback_cb(__unused async_context_t *context, async_at_time_worker_t *worker) {
+    mqtt_t *state = (mqtt_t *)worker->user_data;
+    state->weatherDataOnFly = false;
+}
+
 static void publish_worker_request_cb(void *arg, err_t err) {
     mqtt_t *state = (mqtt_t *)arg;
+    async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->publishWorkerReqFallback, 30000);
 
     if (err != 0) {
         DEBUG_printf("publish_worker_request_cb failed %d\n", err);
@@ -171,6 +178,8 @@ static void publish_worker_fn(__unused async_context_t *context, async_at_time_w
 
     err_t err = mqtt_publish(state->mqttClientInst, topic, payload.msg, payload.len,
                              MQTT_PUBLISH_QOS, 0, &publish_worker_request_cb, state);
+    async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->publishWorkerReqFallback, 30000);
 
     if (err == ERR_OK) {
         state->weatherDataOnFly = true;
@@ -212,6 +221,9 @@ static mqtt_t *mqtt_init() {
 
     state->publishWorker.do_work = publish_worker_fn;
     state->publishWorker.user_data = state;
+
+    state->publishWorkerReqFallback.do_work = publish_worker_request_fallback_cb;
+    state->publishWorkerReqFallback.user_data = state;
 
     state->mqttClientInfo.keep_alive = MQTT_KEEP_ALIVE_S; // Keep alive in sec
 
