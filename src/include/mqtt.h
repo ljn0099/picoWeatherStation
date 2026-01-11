@@ -41,6 +41,7 @@ typedef struct {
     bool connectDone;
     int subscribeCount;
     bool stopClient;
+    bool weatherDataOnFly;
     async_at_time_worker_t requestWorker;
     async_at_time_worker_t publishWorker;
 } mqtt_t;

@@ -138,19 +138,28 @@ static void publish_worker_request_cb(void *arg, err_t err) {
     mqtt_t *state = (mqtt_t *)arg;
 
     if (err != 0) {
-        ERROR_printf("publish_worker_request_cb failed %d\n", err);
+        DEBUG_printf("publish_worker_request_cb failed %d\n", err);
         async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
                                                            &state->requestWorker, MQTT_RETRY_MS);
     }
     else {
-        ERROR_printf("publish_worker_request_cb correct\n");
+        DEBUG_printf("publish_worker_request_cb correct\n");
+        queue_try_remove(&weatherSerializedQueue, NULL);
     }
+
+    state->weatherDataOnFly = false;
 }
 
 static void publish_worker_fn(__unused async_context_t *context, async_at_time_worker_t *worker) {
     mqtt_t *state = (mqtt_t *)worker->user_data;
 
     payload_t payload;
+
+    if (state->weatherDataOnFly) {
+        hard_assert(async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+        return;
+    }
 
     if (!queue_try_peek(&weatherSerializedQueue, &payload)) {
         hard_assert(async_context_add_at_time_worker_in_ms(
@@ -164,7 +173,7 @@ static void publish_worker_fn(__unused async_context_t *context, async_at_time_w
                              MQTT_PUBLISH_QOS, 0, &publish_worker_request_cb, state);
 
     if (err == ERR_OK) {
-        queue_try_remove(&weatherSerializedQueue, NULL);
+        state->weatherDataOnFly = true;
     }
     else {
         DEBUG_printf("Error trying to publish mqtt msg\n");
@@ -214,6 +223,7 @@ static mqtt_t *mqtt_init() {
     state->mqttClientInfo.will_msg = MQTT_WILL_MSG;
     state->mqttClientInfo.will_qos = MQTT_WILL_QOS;
     state->mqttClientInfo.will_retain = true;
+    state->weatherDataOnFly = false;
 
     static const uint8_t ca_cert[] = TLS_ROOT_CERT;
     state->mqttClientInfo.tls_config =
