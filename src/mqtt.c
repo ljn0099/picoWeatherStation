@@ -29,8 +29,8 @@ static void sub_request_cb(void *arg, err_t err) {
     mqtt_t *state = (mqtt_t *)arg;
     if (err != 0) {
         ERROR_printf("subscribe request failed %d", err);
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, MQTT_RETRY_MS));
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, MQTT_RETRY_MS);
         return;
     }
     state->subscribeCount++;
@@ -40,8 +40,8 @@ static void unsub_request_cb(void *arg, err_t err) {
     mqtt_t *state = (mqtt_t *)arg;
     if (err != 0) {
         ERROR_printf("unsubscribe request failed %d", err);
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, MQTT_RETRY_MS));
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, MQTT_RETRY_MS);
         return;
     }
     state->subscribeCount--;
@@ -94,8 +94,8 @@ static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection
     else {
         DEBUG_printf("MQTT disconnected (status %d), reconnecting...\n", status);
         state->connectDone = false;
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, MQTT_RETRY_MS));
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, MQTT_RETRY_MS);
     }
 }
 
@@ -107,8 +107,8 @@ static void mqtt_start_client(mqtt_t *state) {
     if (mqtt_client_connect(state->mqttClientInst, &state->mqttServerAddress, MQTT_SERVER_PORT,
                             mqtt_connection_cb, state, &state->mqttClientInfo) != ERR_OK) {
         DEBUG_printf("MQTT broker connection error\n");
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, MQTT_RETRY_MS));
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, MQTT_RETRY_MS);
         cyw43_arch_lwip_end();
         return;
     }
@@ -129,8 +129,21 @@ static void mqtt_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *
     }
     else {
         DEBUG_printf("mqtt dns request failed\n");
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, DNS_RETRY_MS));
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, DNS_RETRY_MS);
+    }
+}
+
+static void publish_worker_request_cb(void *arg, err_t err) {
+    mqtt_t *state = (mqtt_t *)arg;
+
+    if (err != 0) {
+        ERROR_printf("publish_worker_request_cb failed %d\n", err);
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, MQTT_RETRY_MS);
+    }
+    else {
+        ERROR_printf("publish_worker_request_cb correct\n");
     }
 }
 
@@ -148,7 +161,7 @@ static void publish_worker_fn(__unused async_context_t *context, async_at_time_w
     const char *topic = full_topic("/data");
 
     err_t err = mqtt_publish(state->mqttClientInst, topic, payload.msg, payload.len,
-                             MQTT_PUBLISH_QOS, 0, NULL, state);
+                             MQTT_PUBLISH_QOS, 0, &publish_worker_request_cb, state);
 
     if (err == ERR_OK) {
         queue_try_remove(&weatherSerializedQueue, NULL);
@@ -170,8 +183,8 @@ static void request_worker_fn(__unused async_context_t *context, async_at_time_w
     }
     else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
         DEBUG_printf("dns request failed\n");
-        hard_assert(async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
-                                                           &state->requestWorker, DNS_RETRY_MS));
+        async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(),
+                                                           &state->requestWorker, DNS_RETRY_MS);
     }
 }
 

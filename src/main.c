@@ -543,11 +543,11 @@ int main(void) {
 
     DEBUG_printf("Hello :)\n");
 
-#ifdef NDEBUG
-    watchdog_enable(WATCHDOG_INTERVAL_MS, true);
-#else
-    watchdog_enable(WATCHDOG_INTERVAL_MS, false);
-#endif
+// #ifdef NDEBUG
+//     watchdog_enable(WATCHDOG_INTERVAL_MS, true);
+// #else
+//     watchdog_enable(WATCHDOG_INTERVAL_MS, false);
+// #endif
 
     weatherAverage_t weatherAverage = {0};
     weatherFinal_t weatherFinal = {0};
@@ -859,20 +859,20 @@ void core1_entry(void) {
         if (wifiAttempts >= WIFI_RECONNECT_MAX)
             panic("To much wifi failed attempts");
 
-        DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTimeStart);
-        DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTimeEnd);
-        DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
-        DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal.windSpeedKmH.value);
-        DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal.windDirectionDeg.value);
-        DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal.peakWindSpeedKmH.value);
-        DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal.peakWindDirectionDeg.value);
-        DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal.temperatureCelsius.value);
-        DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal.humidityRh.value);
-        DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal.pressureHPA.value);
-        DEBUG_printf("Lux: %.2f\n", weatherFinal.lux.value);
-        DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
-        DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal.solarIrradianceWm2.value);
-        DEBUG_printf("\n");
+        // DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTimeStart);
+        // DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTimeEnd);
+        // DEBUG_printf("Rainfall: %.2f mm\n", weatherFinal.rainfallMM.value);
+        // DEBUG_printf("Average wind speed: %.2f km/h\n", weatherFinal.windSpeedKmH.value);
+        // DEBUG_printf("Average wind direction: %.2fº\n", weatherFinal.windDirectionDeg.value);
+        // DEBUG_printf("Peak wind speed: %.2f km/h\n", weatherFinal.peakWindSpeedKmH.value);
+        // DEBUG_printf("Peak wind direction: %.2fº\n", weatherFinal.peakWindDirectionDeg.value);
+        // DEBUG_printf("Temperature: %.2f ºC\n", weatherFinal.temperatureCelsius.value);
+        // DEBUG_printf("Humidity: %.2f Rh\n", weatherFinal.humidityRh.value);
+        // DEBUG_printf("Pressure: %.2f hPa\n", weatherFinal.pressureHPA.value);
+        // DEBUG_printf("Lux: %.2f\n", weatherFinal.lux.value);
+        // DEBUG_printf("UVI: %.2f\n", weatherFinal.uvi.value);
+        // DEBUG_printf("Solar irradiance: %.2f Wm/2\n", weatherFinal.solarIrradianceWm2.value);
+        // DEBUG_printf("\n");
 
         payload_t payload;
 
@@ -883,10 +883,10 @@ void core1_entry(void) {
         }
 
         DEBUG_printf("Payload length: %zu bytes\n", payload.len);
-        DEBUG_printf("Payload (hex): ");
-        for (size_t i = 0; i < payload.len; i++)
-            DEBUG_printf("%02X ", payload.msg[i]);
-        DEBUG_printf("\n");
+        // DEBUG_printf("Payload (hex): ");
+        // for (size_t i = 0; i < payload.len; i++)
+        //     DEBUG_printf("%02X ", payload.msg[i]);
+        // DEBUG_printf("\n");
 
         queue_try_add(&weatherSerializedQueue, &payload);
     }
