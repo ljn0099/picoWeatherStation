@@ -88,8 +88,8 @@ static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection
             mqtt_publish(state->mqttClientInst, state->mqttClientInfo.will_topic, "1", 1,
                          MQTT_WILL_QOS, true, pub_request_cb, state);
         }
-        hard_assert(async_context_add_at_time_worker_in_ms(
-            cyw43_arch_async_context(), &state->publishWorker, MQTT_PUBLISH_TIME_MS));
+        async_context_add_at_time_worker_in_ms(
+            cyw43_arch_async_context(), &state->publishWorker, MQTT_PUBLISH_TIME_MS);
     }
     else {
         DEBUG_printf("MQTT disconnected (status %d), reconnecting...\n", status);
