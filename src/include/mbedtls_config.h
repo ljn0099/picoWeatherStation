@@ -66,6 +66,7 @@
 #define MBEDTLS_ECP_C
 #define MBEDTLS_ECDSA_C
 #define MBEDTLS_ASN1_WRITE_C
+#define MBEDTLS_SHA384_C
 
 // The following is needed to parse a certificate
 #define MBEDTLS_PEM_PARSE_C
