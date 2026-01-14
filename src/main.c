@@ -475,6 +475,7 @@ uint64_t aon_get_epoch() {
 
 void sync_time(time_msg_t msg, pcf8523_t *pcf8523) {
     if (msg.alert == NTP_SUCCESS) {
+        DEBUG_printf("Setted time from NTP\n");
         // Set new time
         struct timespec localTime;
         if (!aon_timer_get_time(&localTime)) {
@@ -496,6 +497,7 @@ void sync_time(time_msg_t msg, pcf8523_t *pcf8523) {
         print_struct_tm(&tm);
     }
     else {
+        DEBUG_printf("Setted time from the RTC\n");
         // Get time from rtc
         uint64_t epoch;
         pcf8523_get_epoch(pcf8523, &epoch);
@@ -625,7 +627,7 @@ int main(void) {
     while (!queue_try_remove(&timeResultQueue, &msg)) {
         watchdog_update();
         syncAttempts++;
-        if (syncAttempts >= 10)
+        if (syncAttempts >= 40)
             panic("Error syncing time");
         sleep_ms(WATCHDOG_INTERVAL_MS-500);
     }
@@ -854,6 +856,7 @@ void core1_entry(void) {
         else {
             cyw43_arch_wifi_connect_async(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK);
             wifiAttempts++;
+            DEBUG_printf("Wifi reconnect attempt: %ld\n", wifiAttempts);
         }
 
         if (wifiAttempts >= WIFI_RECONNECT_MAX)
