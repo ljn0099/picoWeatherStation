@@ -90,8 +90,6 @@
 #define WIND_VANE_TOLERANCE_V 0.05f
 #define WIND_VANE_TOLERANCE_ADC (VOLT_TO_ADC(WIND_VANE_TOLERANCE_V))
 
-#define WIFI_RECONNECT_MAX 15
-
 typedef struct {
     uint16_t adcValue;
     float directionRad;
@@ -858,9 +856,6 @@ void core1_entry(void) {
             wifiAttempts++;
             DEBUG_printf("Wifi reconnect attempt: %ld\n", wifiAttempts);
         }
-
-        if (wifiAttempts >= WIFI_RECONNECT_MAX)
-            panic("To much wifi failed attempts");
 
         // DEBUG_printf("Timestamp epoch start: %lld\n", weatherFinal.epochTimeStart);
         // DEBUG_printf("Timestamp epoch end: %lld\n", weatherFinal.epochTimeEnd);
