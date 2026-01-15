@@ -24,6 +24,7 @@
 #include "include/utils.h"
 #include "include/weather_protocol.h"
 #include "include/weather_types.h"
+#include "psa/crypto.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -543,6 +544,8 @@ int main(void) {
 
     DEBUG_printf("Hello :)\n");
 
+    psa_crypto_init();
+
 // #ifdef NDEBUG
 //     watchdog_enable(WATCHDOG_INTERVAL_MS, true);
 // #else
@@ -813,6 +816,8 @@ mbedtls_time_t mbedtls_get_time(mbedtls_time_t *t) {
 
 void core1_entry(void) {
     DEBUG_printf("Hello from core 1 :)\n");
+
+    psa_crypto_init();
 
     // CYW43
     if (cyw43_arch_init()) {

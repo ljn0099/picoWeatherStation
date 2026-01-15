@@ -75,4 +75,84 @@
 // The following significantly speeds up mbedtls due to NIST optimizations.
 #define MBEDTLS_ECP_NIST_OPTIM
 
+/* --- TLS 1.3 --- */
+#define MBEDTLS_SSL_PROTO_TLS1_3
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL_ENABLED
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL_ENABLED
+#define MBEDTLS_SSL_KEEP_PEER_CERTIFICATE
+
+/* --- PSA Crypto (requerido por TLS 1.3) --- */
+#define MBEDTLS_PSA_CRYPTO_CLIENT
+#define PSA_WANT_ALG_HKDF_EXTRACT
+#define PSA_WANT_ALG_HKDF_EXPAND
+#define PSA_WANT_ALG_SHA_256     // TLS 1.3 puede usar SHA-256 o SHA-384
+#define PSA_WANT_ALG_SHA_384
+
+/* --- Key exchange --- */
+#define PSA_WANT_ALG_ECDH         // Para ECDHE
+// #define PSA_WANT_ALG_FFDH       // Solo si quieres Finite Field DH (opcional)
+
+#define MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED
+#define MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+#define MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
+
+/* --- Certificados y PK --- */
+#define MBEDTLS_X509_CRT_PARSE_C
+#define MBEDTLS_PK_CAN_ECDSA_SIGN    // Para certificados ECDSA
+#define MBEDTLS_PKCS1_V21            // Para certificados RSA
+
+/* --- Criptografía --- */
+#define MBEDTLS_AES_C
+#define MBEDTLS_GCM_C
+#define MBEDTLS_CIPHER_C
+#define MBEDTLS_SHA256_C
+#define MBEDTLS_SHA384_C
+#define MBEDTLS_ECP_C
+#define MBEDTLS_ECDH_C
+#define MBEDTLS_ECDSA_C
+
+/* --- Curvas ECC --- */
+#define MBEDTLS_ECP_DP_SECP256R1_ENABLED
+#define MBEDTLS_ECP_DP_SECP384R1_ENABLED
+#define MBEDTLS_ECP_DP_CURVE25519_ENABLED
+
+/* --- Entropy y RNG --- */
+#define MBEDTLS_CTR_DRBG_C
+#define MBEDTLS_ENTROPY_C
+#define MBEDTLS_PLATFORM_C
+
+/* --- SSL Core --- */
+#define MBEDTLS_SSL_TLS_C
+
+#define MBEDTLS_PSA_CRYPTO_C
+#define MBEDTLS_PSA_CRYPTO_DRIVERS
+
+// Extra
+#define MBEDTLS_SSL_PROTO_TLS1_3
+#define MBEDTLS_PSA_CRYPTO_C
+#define MBEDTLS_PSA_CRYPTO_CLIENT
+#define PSA_WANT_ALG_HKDF_EXTRACT
+#define PSA_WANT_ALG_HKDF_EXPAND
+#define PSA_WANT_ALG_SHA_256
+#define PSA_WANT_ALG_SHA_384
+#define PSA_WANT_ALG_ECDH          // para ECDHE
+#define MBEDTLS_AES_C
+#define MBEDTLS_GCM_C
+#define MBEDTLS_CIPHER_C
+#define MBEDTLS_SHA256_C
+#define MBEDTLS_SHA384_C
+#define MBEDTLS_ECP_C
+#define MBEDTLS_ECDH_C
+#define MBEDTLS_ECDSA_C
+#define MBEDTLS_PK_CAN_ECDSA_SIGN
+#define MBEDTLS_X509_CRT_PARSE_C
+#define MBEDTLS_PKCS1_V21
+
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL_ENABLED
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL_ENABLED
+
+#define MBEDTLS_ECP_DP_SECP256R1_ENABLED
+#define MBEDTLS_ECP_DP_SECP384R1_ENABLED
+#define MBEDTLS_ECP_DP_CURVE25519_ENABLED
+
 #endif
