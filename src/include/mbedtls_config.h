@@ -52,11 +52,10 @@
 // Enable support for PKCS#1 v2.1 encoding.
 #define MBEDTLS_PKCS1_V21
 
-// Enable the checkup functions (*_self_test).
-#define MBEDTLS_SELF_TEST
-
+#ifndef NDEBUG
 // Enable sending of alert messages in case of encountered errors as per RFC.
 #define MBEDTLS_SSL_ALL_ALERT_MESSAGES
+#endif
 
 // This option controls the availability of the API mbedtls_ssl_get_peer_cert()
 // giving access to the peer's certificate after completion of the handshake.
@@ -120,8 +119,10 @@
 // Enable the CTR_DRBG AES-based random generator.
 #define MBEDTLS_CTR_DRBG_C
 
+#ifndef NDEBUG
 // Enable the debug functions.
 #define MBEDTLS_DEBUG_C
+#endif
 
 // Enable the elliptic curve Diffie-Hellman library.
 #define MBEDTLS_ECDH_C
@@ -198,9 +199,6 @@
 
 // Enable the SHA3 cryptographic hash algorithm.
 #define MBEDTLS_SHA3_C
-
-// Enable simple SSL cache implementation.
-#define MBEDTLS_SSL_CACHE_C
 
 // Enable the SSL/TLS client code.
 #define MBEDTLS_SSL_CLI_C
