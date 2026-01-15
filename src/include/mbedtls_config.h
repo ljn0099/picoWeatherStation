@@ -31,36 +31,6 @@
 // Enable deterministic ECDSA
 #define MBEDTLS_ECDSA_DETERMINISTIC
 
-// Enable the PSK based ciphersuite modes in SSL / TLS
-#define MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
-
-// Enable the DHE-PSK based ciphersuite modes in SSL / TLS
-#define MBEDTLS_KEY_EXCHANGE_DHE_PSK_ENABLED
-
-// Enable the ECDHE-PSK based ciphersuite modes in SSL / TLS
-#define MBEDTLS_KEY_EXCHANGE_ECDHE_PSK_ENABLED
-
-// Enable the RSA-PSK based ciphersuite modes in SSL / TLS.
-#define MBEDTLS_KEY_EXCHANGE_RSA_PSK_ENABLED
-
-// Enable the RSA-only based ciphersuite modes in SSL / TLS
-#define MBEDTLS_KEY_EXCHANGE_RSA_ENABLED
-
-// Enable the DHE-RSA based ciphersuite modes in SSL / TLS
-#define MBEDTLS_KEY_EXCHANGE_DHE_RSA_ENABLED
-
-// Enable the ECDHE-RSA based ciphersuite modes in SSL / TLS.
-#define MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED
-
-// Enable the ECDHE-ECDSA based ciphersuite modes in SSL / TLS.
-#define MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
-
-// Enable the ECDH-ECDSA based ciphersuite modes in SSL / TLS.
-#define MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA_ENABLED
-
-// Enable the ECDH-RSA based ciphersuite modes in SSL / TLS.
-#define MBEDTLS_KEY_EXCHANGE_ECDH_RSA_ENABLED
-
 // Enhance support for reading EC keys using variants of SEC1 not allowed by RFC 5915 and RFC 5480.
 #define MBEDTLS_PK_PARSE_EC_EXTENDED
 
