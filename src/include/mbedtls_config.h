@@ -18,11 +18,7 @@
 #define MBEDTLS_HAVE_ASM
 
 // Ciphers
-#define MBEDTLS_CIPHER_MODE_CBC
-#define MBEDTLS_CIPHER_MODE_CFB
 #define MBEDTLS_CIPHER_MODE_CTR
-#define MBEDTLS_CIPHER_MODE_OFB
-#define MBEDTLS_CIPHER_MODE_XTS
 
 // Enable specific cuvers within the Elliptic Curve Module
 #define MBEDTLS_ECP_DP_SECP192R1_ENABLED
