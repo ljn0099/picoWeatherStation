@@ -109,12 +109,6 @@
 // Enable the multi-precision integer library.
 #define MBEDTLS_BIGNUM_C
 
-// Enable the Camellia block cipher.
-#define MBEDTLS_CAMELLIA_C
-
-//  Enable the ARIA block cipher.
-#define MBEDTLS_ARIA_C
-
 // Enable the Counter with CBC-MAC (CCM) mode for 128-bit block cipher.
 #define MBEDTLS_CCM_C
 
@@ -127,30 +121,17 @@
 // Enable the generic cipher layer.
 #define MBEDTLS_CIPHER_C
 
-// Enable the CMAC (Cipher-based Message Authentication Code) mode for block
-// ciphers.
-#define MBEDTLS_CMAC_C
-
 // Enable the CTR_DRBG AES-based random generator.
 #define MBEDTLS_CTR_DRBG_C
 
 // Enable the debug functions.
 #define MBEDTLS_DEBUG_C
 
-// Enable the DES block cipher.
-#define MBEDTLS_DES_C
-
-// Enable the Diffie-Hellman-Merkle module.
-#define MBEDTLS_DHM_C
-
 // Enable the elliptic curve Diffie-Hellman library.
 #define MBEDTLS_ECDH_C
 
 // Enable the elliptic curve DSA library.
 #define MBEDTLS_ECDSA_C
-
-// Enable the elliptic curve J-PAKE library.
-#define MBEDTLS_ECJPAKE_C
 
 // Enable the elliptic curve over GF(p) library
 #define MBEDTLS_ECP_C
@@ -173,14 +154,8 @@
 // Enable the LMS stateful-hash asymmetric signature algorithm.
 #define MBEDTLS_LMS_C
 
-// Enable the Key Wrapping mode for 128-bit block ciphers
-#define MBEDTLS_NIST_KW_C
-
 // Enable the generic layer for message digest (hashing) and HMAC.
 #define MBEDTLS_MD_C
-
-// Enable the MD5 hash algorithm.
-#define MBEDTLS_MD5_C
 
 // Enable the OID database.
 #define MBEDTLS_OID_C
@@ -200,15 +175,6 @@
 // Enable the generic public (asymmetric) key writer.
 #define MBEDTLS_PK_WRITE_C
 
-// Enable PKCS#5 functions.
-#define MBEDTLS_PKCS5_C
-
-// Enable PKCS #7 core for using PKCS #7-formatted signatures.
-#define MBEDTLS_PKCS7_C
-
-// Enable PKCS#12 PBE functions.
-#define MBEDTLS_PKCS12_C
-
 // Enable the platform abstraction layer that allows you to re-assign
 // functions like calloc(), free(), snprintf(), printf(), fprintf(), exit().
 #define MBEDTLS_PLATFORM_C
@@ -219,14 +185,8 @@
 // Enable the Platform Security Architecture cryptography API.
 #define MBEDTLS_PSA_CRYPTO_C
 
-// Enable the RIPEMD-160 hash algorithm.
-#define MBEDTLS_RIPEMD160_C
-
 // Enable the RSA public-key cryptosystem.
 #define MBEDTLS_RSA_C
-
-// Enable the SHA1 cryptographic hash algorithm.
-#define MBEDTLS_SHA1_C
 
 // Enable the SHA-224 cryptographic hash algorithm.
 #define MBEDTLS_SHA224_C
@@ -245,9 +205,6 @@
 
 // Enable simple SSL cache implementation.
 #define MBEDTLS_SSL_CACHE_C
-
-//  Enable an implementation of TLS server-side callbacks for session tickets.
-#define MBEDTLS_SSL_TICKET_C
 
 // Enable the SSL/TLS client code.
 #define MBEDTLS_SSL_CLI_C
