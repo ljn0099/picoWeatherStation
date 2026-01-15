@@ -7,7 +7,7 @@
 #include "pico/cyw43_arch.h"
 #include <time.h>
 
-#define NTP_SERVER "ntp.roa.es"
+#define NTP_SERVER "ntp.picoweather.net"
 #define NTP_PORT 123
 
 #define NTP_CURRENT_ERA 0
