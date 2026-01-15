@@ -116,14 +116,6 @@
 // functions mbedtls_ssl_context_save() and mbedtls_ssl_context_load().
 #define MBEDTLS_SSL_CONTEXT_SERIALIZATION
 
-// This allows peers that both support it to use a more robust protection for
-// ciphersuites using CBC, providing deep resistance against timing attacks
-// on the padding or underlying cipher.
-#define MBEDTLS_SSL_ENCRYPT_THEN_MAC
-
-// Enable support for RFC 7627: Session Hash and Extended Master Secret Extension.
-#define MBEDTLS_SSL_EXTENDED_MASTER_SECRET
-
 // This option controls the availability of the API mbedtls_ssl_get_peer_cert()
 // giving access to the peer's certificate after completion of the handshake.
 #define MBEDTLS_SSL_KEEP_PEER_CERTIFICATE
