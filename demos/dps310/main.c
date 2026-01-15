@@ -5,9 +5,9 @@
 #include "hardware/i2c.h"
 #include "sensor/dps310.h"
 
-#define I2C_BUS i2c0
-#define I2C_SDA 16
-#define I2C_SCL 17
+#define I2C_BUS i2c1
+#define I2C_SDA 18
+#define I2C_SCL 19
 #define I2C_ADDRESS 0x77
 #define I2C_SPEED 100000
 
