@@ -312,9 +312,6 @@
 // Enable simple SSL cache implementation.
 #define MBEDTLS_SSL_CACHE_C
 
-// Enable basic implementation of DTLS cookies for hello verification.
-#define MBEDTLS_SSL_COOKIE_C
-
 //  Enable an implementation of TLS server-side callbacks for session tickets.
 #define MBEDTLS_SSL_TICKET_C
 
