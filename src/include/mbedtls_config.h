@@ -58,10 +58,6 @@
 // Enable sending of alert messages in case of encountered errors as per RFC.
 #define MBEDTLS_SSL_ALL_ALERT_MESSAGES
 
-// Enable serialization of the TLS context structures, through use of the
-// functions mbedtls_ssl_context_save() and mbedtls_ssl_context_load().
-#define MBEDTLS_SSL_CONTEXT_SERIALIZATION
-
 // This option controls the availability of the API mbedtls_ssl_get_peer_cert()
 // giving access to the peer's certificate after completion of the handshake.
 #define MBEDTLS_SSL_KEEP_PEER_CERTIFICATE
