@@ -104,9 +104,6 @@
 // Enable the multi-precision integer library.
 #define MBEDTLS_BIGNUM_C
 
-// Enable the Counter with CBC-MAC (CCM) mode for 128-bit block cipher.
-#define MBEDTLS_CCM_C
-
 // Enable the ChaCha20 stream cipher.
 #define MBEDTLS_CHACHA20_C
 
@@ -148,9 +145,6 @@
 // Enable the HMAC_DRBG random generator.
 #define MBEDTLS_HMAC_DRBG_C
 
-// Enable the LMS stateful-hash asymmetric signature algorithm.
-#define MBEDTLS_LMS_C
-
 // Enable the generic layer for message digest (hashing) and HMAC.
 #define MBEDTLS_MD_C
 
@@ -185,9 +179,6 @@
 // Enable the RSA public-key cryptosystem.
 #define MBEDTLS_RSA_C
 
-// Enable the SHA-224 cryptographic hash algorithm.
-#define MBEDTLS_SHA224_C
-
 // Enable the SHA-256 cryptographic hash algorithm.
 #define MBEDTLS_SHA256_C
 
@@ -196,9 +187,6 @@
 
 // Enable SHA-512 cryptographic hash algorithms.
 #define MBEDTLS_SHA512_C
-
-// Enable the SHA3 cryptographic hash algorithm.
-#define MBEDTLS_SHA3_C
 
 // Enable the SSL/TLS client code.
 #define MBEDTLS_SSL_CLI_C
