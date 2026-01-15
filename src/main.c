@@ -472,6 +472,17 @@ uint64_t aon_get_epoch() {
     return ts.tv_sec;
 }
 
+uint64_t aon_get_epoch_ms() {
+    struct timespec ts;
+
+    if (!aon_timer_get_time(&ts))
+        panic("Error getting time from aon");
+
+    int64_t rc = ts.tv_sec * 1000;
+    rc += ts.tv_nsec / 1000000;
+    return (uint64_t) rc;
+}
+
 void sync_time(time_msg_t msg, pcf8523_t *pcf8523) {
     if (msg.alert == NTP_SUCCESS) {
         DEBUG_printf("Setted time from NTP\n");
@@ -812,6 +823,10 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
 
 mbedtls_time_t mbedtls_get_time(mbedtls_time_t *t) {
     return aon_get_epoch();
+}
+
+mbedtls_ms_time_t mbedtls_ms_time(void) {
+    return aon_get_epoch_ms();
 }
 
 void core1_entry(void) {
