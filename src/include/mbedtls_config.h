@@ -312,9 +312,6 @@
 // Enable the SSL/TLS client code.
 #define MBEDTLS_SSL_CLI_C
 
-// Enable the SSL/TLS server code.
-#define MBEDTLS_SSL_SRV_C
-
 // Enable the generic SSL/TLS code.
 #define MBEDTLS_SSL_TLS_C
 
