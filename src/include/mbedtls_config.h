@@ -95,9 +95,6 @@
 // Enable the generic ASN1 parser.
 #define MBEDTLS_ASN1_PARSE_C
 
-// Enable the generic ASN1 writer.
-#define MBEDTLS_ASN1_WRITE_C
-
 // This module is required for PEM support (required by X.509).
 #define MBEDTLS_BASE64_C
 
@@ -154,17 +151,11 @@
 // Enable PEM decoding / parsing.
 #define MBEDTLS_PEM_PARSE_C
 
-// Enable PEM encoding / writing.
-#define MBEDTLS_PEM_WRITE_C
-
 // Enable the generic public (asymmetric) key layer.
 #define MBEDTLS_PK_C
 
 // Enable the generic public (asymmetric) key parser.
 #define MBEDTLS_PK_PARSE_C
-
-// Enable the generic public (asymmetric) key writer.
-#define MBEDTLS_PK_WRITE_C
 
 // Enable the platform abstraction layer that allows you to re-assign
 // functions like calloc(), free(), snprintf(), printf(), fprintf(), exit().
@@ -208,14 +199,5 @@
 
 // Enable X.509 Certificate Signing Request (CSR) parsing.
 #define MBEDTLS_X509_CSR_PARSE_C
-
-// Enable X.509 core for creating certificates.
-#define MBEDTLS_X509_CREATE_C
-
-// Enable creating X.509 certificates.
-#define MBEDTLS_X509_CRT_WRITE_C
-
-// Enable creating X.509 Certificate Signing Requests (CSR).
-#define MBEDTLS_X509_CSR_WRITE_C
 
 #endif
