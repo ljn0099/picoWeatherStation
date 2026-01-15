@@ -15,64 +15,225 @@
 #define MBEDTLS_PLATFORM_MS_TIME_ALT
 #define MBEDTLS_PLATFORM_TIME_ALT
 
-#define MBEDTLS_CIPHER_MODE_CBC
-#define MBEDTLS_ECP_DP_SECP192R1_ENABLED
-#define MBEDTLS_ECP_DP_SECP224R1_ENABLED
+#define MBEDTLS_HAVE_ASM
+
+// Enable specific cuvers within the Elliptic Curve Module
 #define MBEDTLS_ECP_DP_SECP256R1_ENABLED
 #define MBEDTLS_ECP_DP_SECP384R1_ENABLED
 #define MBEDTLS_ECP_DP_SECP521R1_ENABLED
-#define MBEDTLS_ECP_DP_SECP192K1_ENABLED
-#define MBEDTLS_ECP_DP_SECP224K1_ENABLED
-#define MBEDTLS_ECP_DP_SECP256K1_ENABLED
-#define MBEDTLS_ECP_DP_BP256R1_ENABLED
-#define MBEDTLS_ECP_DP_BP384R1_ENABLED
-#define MBEDTLS_ECP_DP_BP512R1_ENABLED
+// Montgomery curves (supporting ECP)
 #define MBEDTLS_ECP_DP_CURVE25519_ENABLED
-#define MBEDTLS_KEY_EXCHANGE_RSA_ENABLED
+#define MBEDTLS_ECP_DP_CURVE448_ENABLED
+
+// Use nist optimizations for Elliptic Curve
+#define MBEDTLS_ECP_NIST_OPTIM
+
+// Enable deterministic ECDSA
+#define MBEDTLS_ECDSA_DETERMINISTIC
+
+// Enhance support for reading EC keys using variants of SEC1 not allowed by RFC 5915 and RFC 5480.
+#define MBEDTLS_PK_PARSE_EC_EXTENDED
+
+// Enable the support for parsing public keys of type Short Weierstrass
+// (MBEDTLS_ECP_DP_SECP_XXX and MBEDTLS_ECP_DP_BP_XXX) which are using the
+// compressed point format. This parsing is done through ECP module's functions.
+#define MBEDTLS_PK_PARSE_EC_COMPRESSED
+
+// Enable a dummy error function to make use of mbedtls_strerror() in
+// third party libraries easier when MBEDTLS_ERROR_C is disabled
+#define MBEDTLS_ERROR_STRERROR_DUMMY
+
+// Support external private RSA keys (eg from a HSM) in the PK layer.
+#define MBEDTLS_PK_RSA_ALT_SUPPORT
+
+// Enable support for PKCS#1 v1.5 encoding.
 #define MBEDTLS_PKCS1_V15
-#define MBEDTLS_SHA256_SMALLER
+
+// Enable support for PKCS#1 v2.1 encoding.
+#define MBEDTLS_PKCS1_V21
+
+// Enable the checkup functions (*_self_test).
+#define MBEDTLS_SELF_TEST
+
+// Enable sending of alert messages in case of encountered errors as per RFC.
+#define MBEDTLS_SSL_ALL_ALERT_MESSAGES
+
+// Enable serialization of the TLS context structures, through use of the
+// functions mbedtls_ssl_context_save() and mbedtls_ssl_context_load().
+#define MBEDTLS_SSL_CONTEXT_SERIALIZATION
+
+// This option controls the availability of the API mbedtls_ssl_get_peer_cert()
+// giving access to the peer's certificate after completion of the handshake.
+#define MBEDTLS_SSL_KEEP_PEER_CERTIFICATE
+
+// Enable support for RFC 6066 max_fragment_length extension in SSL.
+#define MBEDTLS_SSL_MAX_FRAGMENT_LENGTH
+
+// Enable support for TLS 1.3
+#define MBEDTLS_SSL_PROTO_TLS1_3
+
+// Enable TLS 1.3 middlebox compatibility mode.
+#define MBEDTLS_SSL_TLS1_3_COMPATIBILITY_MODE
+
+// Enable TLS 1.3 PSK key exchange mode.
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_ENABLED
+
+// Enable TLS 1.3 ephemeral key exchange mode.
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL_ENABLED
+
+// Enable TLS 1.3 PSK ephemeral key exchange mode.
+#define MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL_ENABLED
+
+// Enable support for ALPN.
+#define MBEDTLS_SSL_ALPN
+
+// Enable support for RFC 6066 server name indication (SNI) in SSL.
 #define MBEDTLS_SSL_SERVER_NAME_INDICATION
+
+// Enable parsing and verification of X.509 certificates, CRLs and CSRS
+// signed with RSASSA-PSS (aka PKCS#1 v2.1).
+#define MBEDTLS_X509_RSASSA_PSS_SUPPORT
+
+// Enable the AES block cipher.
 #define MBEDTLS_AES_C
+
+// Enable the generic ASN1 parser.
 #define MBEDTLS_ASN1_PARSE_C
-#define MBEDTLS_BIGNUM_C
-#define MBEDTLS_CIPHER_C
-#define MBEDTLS_CTR_DRBG_C
-#define MBEDTLS_ENTROPY_C
-#define MBEDTLS_ERROR_C
-#define MBEDTLS_MD_C
-#define MBEDTLS_MD5_C
-#define MBEDTLS_OID_C
-#define MBEDTLS_PKCS5_C
-#define MBEDTLS_PK_C
-#define MBEDTLS_PK_PARSE_C
-#define MBEDTLS_PLATFORM_C
-#define MBEDTLS_RSA_C
-#define MBEDTLS_SHA1_C
-#define MBEDTLS_SHA224_C
-#define MBEDTLS_SHA256_C
-#define MBEDTLS_SHA512_C
-#define MBEDTLS_SSL_CLI_C
-#define MBEDTLS_SSL_SRV_C
-#define MBEDTLS_SSL_TLS_C
-#define MBEDTLS_X509_CRT_PARSE_C
-#define MBEDTLS_X509_USE_C
-#define MBEDTLS_AES_FEWER_TABLES
 
-/* TLS 1.2 */
-#define MBEDTLS_SSL_PROTO_TLS1_2
-#define MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
-#define MBEDTLS_GCM_C
-#define MBEDTLS_ECDH_C
-#define MBEDTLS_ECP_C
-#define MBEDTLS_ECDSA_C
+// Enable the generic ASN1 writer.
 #define MBEDTLS_ASN1_WRITE_C
-#define MBEDTLS_SHA384_C
 
-// The following is needed to parse a certificate
-#define MBEDTLS_PEM_PARSE_C
+// This module is required for PEM support (required by X.509).
 #define MBEDTLS_BASE64_C
 
-// The following significantly speeds up mbedtls due to NIST optimizations.
-#define MBEDTLS_ECP_NIST_OPTIM
+// Enable the multi-precision integer library.
+#define MBEDTLS_BIGNUM_C
+
+// Enable the Counter with CBC-MAC (CCM) mode for 128-bit block cipher.
+#define MBEDTLS_CCM_C
+
+// Enable the ChaCha20 stream cipher.
+#define MBEDTLS_CHACHA20_C
+
+// Enable the ChaCha20-Poly1305 AEAD algorithm.
+#define MBEDTLS_CHACHAPOLY_C
+
+// Enable the generic cipher layer.
+#define MBEDTLS_CIPHER_C
+
+// Enable the CTR_DRBG AES-based random generator.
+#define MBEDTLS_CTR_DRBG_C
+
+// Enable the debug functions.
+#define MBEDTLS_DEBUG_C
+
+// Enable the elliptic curve Diffie-Hellman library.
+#define MBEDTLS_ECDH_C
+
+// Enable the elliptic curve DSA library.
+#define MBEDTLS_ECDSA_C
+
+// Enable the elliptic curve over GF(p) library
+#define MBEDTLS_ECP_C
+
+// Enable the platform-specific entropy code.
+#define MBEDTLS_ENTROPY_C
+
+// Enable error code to error string conversion.
+#define MBEDTLS_ERROR_C
+
+// Enable the Galois/Counter Mode (GCM).
+#define MBEDTLS_GCM_C
+
+// Enable the HKDF algorithm (RFC 5869).
+#define MBEDTLS_HKDF_C
+
+// Enable the HMAC_DRBG random generator.
+#define MBEDTLS_HMAC_DRBG_C
+
+// Enable the LMS stateful-hash asymmetric signature algorithm.
+#define MBEDTLS_LMS_C
+
+// Enable the generic layer for message digest (hashing) and HMAC.
+#define MBEDTLS_MD_C
+
+// Enable the OID database.
+#define MBEDTLS_OID_C
+
+// Enable PEM decoding / parsing.
+#define MBEDTLS_PEM_PARSE_C
+
+// Enable PEM encoding / writing.
+#define MBEDTLS_PEM_WRITE_C
+
+// Enable the generic public (asymmetric) key layer.
+#define MBEDTLS_PK_C
+
+// Enable the generic public (asymmetric) key parser.
+#define MBEDTLS_PK_PARSE_C
+
+// Enable the generic public (asymmetric) key writer.
+#define MBEDTLS_PK_WRITE_C
+
+// Enable the platform abstraction layer that allows you to re-assign
+// functions like calloc(), free(), snprintf(), printf(), fprintf(), exit().
+#define MBEDTLS_PLATFORM_C
+
+// Enable the Poly1305 MAC algorithm.
+#define MBEDTLS_POLY1305_C
+
+// Enable the Platform Security Architecture cryptography API.
+#define MBEDTLS_PSA_CRYPTO_C
+
+// Enable the RSA public-key cryptosystem.
+#define MBEDTLS_RSA_C
+
+// Enable the SHA-224 cryptographic hash algorithm.
+#define MBEDTLS_SHA224_C
+
+// Enable the SHA-256 cryptographic hash algorithm.
+#define MBEDTLS_SHA256_C
+
+// Enable the SHA-384 cryptographic hash algorithm.
+#define MBEDTLS_SHA384_C
+
+// Enable SHA-512 cryptographic hash algorithms.
+#define MBEDTLS_SHA512_C
+
+// Enable the SHA3 cryptographic hash algorithm.
+#define MBEDTLS_SHA3_C
+
+// Enable simple SSL cache implementation.
+#define MBEDTLS_SSL_CACHE_C
+
+// Enable the SSL/TLS client code.
+#define MBEDTLS_SSL_CLI_C
+
+// Enable the generic SSL/TLS code.
+#define MBEDTLS_SSL_TLS_C
+
+// Enable run-time version information.
+#define MBEDTLS_VERSION_C
+
+// Enable X.509 core for using certificates.
+#define MBEDTLS_X509_USE_C
+
+// Enable X.509 certificate parsing.
+#define MBEDTLS_X509_CRT_PARSE_C
+
+// Enable X.509 CRL parsing.
+#define MBEDTLS_X509_CRL_PARSE_C
+
+// Enable X.509 Certificate Signing Request (CSR) parsing.
+#define MBEDTLS_X509_CSR_PARSE_C
+
+// Enable X.509 core for creating certificates.
+#define MBEDTLS_X509_CREATE_C
+
+// Enable creating X.509 certificates.
+#define MBEDTLS_X509_CRT_WRITE_C
+
+// Enable creating X.509 Certificate Signing Requests (CSR).
+#define MBEDTLS_X509_CSR_WRITE_C
 
 #endif
