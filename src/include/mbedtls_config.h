@@ -43,9 +43,6 @@
 // third party libraries easier when MBEDTLS_ERROR_C is disabled
 #define MBEDTLS_ERROR_STRERROR_DUMMY
 
-// Enable the prime-number generation code.
-#define MBEDTLS_GENPRIME
-
 // Support external private RSA keys (eg from a HSM) in the PK layer.
 #define MBEDTLS_PK_RSA_ALT_SUPPORT
 
