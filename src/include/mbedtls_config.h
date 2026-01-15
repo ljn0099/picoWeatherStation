@@ -24,12 +24,6 @@
 #define MBEDTLS_CIPHER_MODE_OFB
 #define MBEDTLS_CIPHER_MODE_XTS
 
-// Support for specific padding modes in the cipher layer.
-#define MBEDTLS_CIPHER_PADDING_PKCS7
-#define MBEDTLS_CIPHER_PADDING_ONE_AND_ZEROS
-#define MBEDTLS_CIPHER_PADDING_ZEROS_AND_LEN
-#define MBEDTLS_CIPHER_PADDING_ZEROS
-
 // Enable specific cuvers within the Elliptic Curve Module
 #define MBEDTLS_ECP_DP_SECP192R1_ENABLED
 #define MBEDTLS_ECP_DP_SECP224R1_ENABLED
