@@ -100,12 +100,6 @@
 // signed with RSASSA-PSS (aka PKCS#1 v2.1).
 #define MBEDTLS_X509_RSASSA_PSS_SUPPORT
 
-// Enable AES-NI support on x86-64 or x86-32.
-#define MBEDTLS_AESNI_C
-
-// Enable AES cryptographic extension support on Armv8.
-#define MBEDTLS_AESCE_C
-
 // Enable the AES block cipher.
 #define MBEDTLS_AES_C
 
@@ -196,9 +190,6 @@
 
 // Enable the OID database.
 #define MBEDTLS_OID_C
-
-// Enable VIA Padlock support on x86.
-#define MBEDTLS_PADLOCK_C
 
 // Enable PEM decoding / parsing.
 #define MBEDTLS_PEM_PARSE_C
