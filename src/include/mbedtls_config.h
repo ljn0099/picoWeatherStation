@@ -90,9 +90,6 @@
 // Enable support for RFC 6066 server name indication (SNI) in SSL.
 #define MBEDTLS_SSL_SERVER_NAME_INDICATION
 
-// Allow run-time checking of compile-time enabled features.
-#define MBEDTLS_VERSION_FEATURES
-
 // Enable parsing and verification of X.509 certificates, CRLs and CSRS
 // signed with RSASSA-PSS (aka PKCS#1 v2.1).
 #define MBEDTLS_X509_RSASSA_PSS_SUPPORT
