@@ -12,10 +12,7 @@
 
 #define UNIQUE_ID_HEX_LEN (2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1)
 
-// This file includes your client certificate for client server authentication
-#ifdef MQTT_CERT_INC
 #include MQTT_CERT_INC
-#endif
 
 #define DNS_RETRY_MS 5000
 #define MQTT_RETRY_MS 5000

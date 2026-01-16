@@ -1,43 +1,34 @@
 # Helper function to require variables
-function(require_var VAR_NAME ERROR_MESSAGE)
-    if(NOT DEFINED ${VAR_NAME} OR ${VAR_NAME} STREQUAL "")
-        message(FATAL_ERROR "${ERROR_MESSAGE}")
+function(require_var VAR_NAME)
+    if(NOT DEFINED ${VAR_NAME} OR "${${VAR_NAME}}" STREQUAL "")
+        message(FATAL_ERROR
+            "Required variable ${VAR_NAME} is not defined.\n"
+            "Use -D${VAR_NAME}=<value>")
     endif()
 endfunction()
 
-# Required WiFi configuration
-require_var(WIFI_SSID     "You must define WIFI_SSID (e.g. -DWIFI_SSID=\"YourWiFiName\")")
-require_var(WIFI_PASSWORD "You must define WIFI_PASSWORD (e.g. -DWIFI_PASSWORD=\"YourWiFiPassword\")")
+# ---------- Required vars ----------
+require_var(WIFI_SSID)
+require_var(WIFI_PASSWORD)
 
-# MQTT configuration (supports environment fallback)
-foreach(VAR MQTT_SERVER MQTT_USERNAME MQTT_PASSWORD)
-    if(NOT DEFINED ${VAR} AND DEFINED ENV{${VAR}})
-        set(${VAR} $ENV{${VAR}})
-        message(STATUS "Using ${VAR} from environment: '${${VAR}}'")
-    endif()
-    require_var(${VAR} "Error: ${VAR} is not defined")
-endforeach()
+require_var(MQTT_SERVER)
+require_var(MQTT_USERNAME)
+require_var(MQTT_PASSWORD)
 
-# Certificate configuration
-if(NOT MQTT_CERT_PATH)
-    set(MQTT_CERT_PATH "${CMAKE_CURRENT_LIST_DIR}/certs/${MQTT_SERVER}")
-endif()
+require_var(MQTT_CERT_FILE)
 
-if(NOT MQTT_CERT_INC)
-    set(MQTT_CERT_INC "mqtt_client.inc")
-endif()
-
-set(MQTT_CERT_FULL_PATH "${MQTT_CERT_PATH}/${MQTT_CERT_INC}")
-
-if(NOT EXISTS "${MQTT_CERT_FULL_PATH}")
+# ---------- Validate MQTT certificate path ----------
+if(NOT EXISTS "${MQTT_CERT_FILE}")
     message(FATAL_ERROR
-        "Missing MQTT certificate include file:\n"
-        "  ${MQTT_CERT_FULL_PATH}\n"
-        "Create the certificate file or specify MQTT_CERT_PATH/MQTT_CERT_INC."
-    )
+        "MQTT certificate file does not exist:\n"
+        "  ${MQTT_CERT_FILE}")
 endif()
 
-# Nanopb protobuf generation
+get_filename_component(MQTT_CERT_FILE "${MQTT_CERT_FILE}" ABSOLUTE)
+get_filename_component(MQTT_CERT_PATH "${MQTT_CERT_FILE}" DIRECTORY)
+get_filename_component(MQTT_CERT_INC  "${MQTT_CERT_FILE}" NAME)
+
+# ---------- Nanopb ----------
 set(NANOPB_DIR "${CMAKE_SOURCE_DIR}/nanopb")
 set(NANOPB_PLUGIN "${NANOPB_DIR}/generator/protoc-gen-nanopb")
 
@@ -66,7 +57,7 @@ add_custom_target(generate_weather_pb
     DEPENDS ${WEATHER_PB_C} ${WEATHER_PB_H} ${WRAPPERS_PB_C} ${WRAPPERS_PB_H}
 )
 
-# Target: picoWeatherStation
+# ---------- Targets ----------
 add_executable(picoWeatherStation
     main.c
     queues.c
@@ -82,7 +73,7 @@ add_executable(picoWeatherStation
 
 add_dependencies(picoWeatherStation generate_weather_pb)
 
-# Compile definitions and include paths
+# ---------- Compile Definitions ----------
 target_compile_definitions(picoWeatherStation PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
@@ -93,6 +84,7 @@ target_compile_definitions(picoWeatherStation PRIVATE
     ALTCP_MBEDTLS_AUTHMODE=MBEDTLS_SSL_VERIFY_REQUIRED
 )
 
+# ---------- Includes ----------
 target_include_directories(picoWeatherStation PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/include
@@ -101,7 +93,7 @@ target_include_directories(picoWeatherStation PRIVATE
     ${MQTT_CERT_PATH}
 )
 
-# Libraries
+# ---------- Libraries ----------
 target_link_libraries(picoWeatherStation
     pico_stdlib
     pico_multicore
@@ -120,7 +112,7 @@ target_link_libraries(picoWeatherStation
     pico_aon_timer
 )
 
-# Pico platform settings
+# ---------- Pico Settings ----------
 pico_enable_stdio_usb(picoWeatherStation 0)
 pico_enable_stdio_uart(picoWeatherStation 1)
 

@@ -237,7 +237,7 @@ static mqtt_t *mqtt_init() {
     state->mqttClientInfo.will_retain = true;
     state->weatherDataOnFly = false;
 
-    static const uint8_t ca_cert[] = TLS_ROOT_CERT;
+    static const uint8_t ca_cert[] = MQTT_TLS_ROOT_CERT;
     state->mqttClientInfo.tls_config =
         altcp_tls_create_config_client((const uint8_t *)ca_cert, sizeof(ca_cert));
 

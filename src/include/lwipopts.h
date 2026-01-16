@@ -2,9 +2,7 @@
 #define _LWIPOPTS_H
 
 // Need more memory for TLS
-#ifdef MQTT_CERT_INC
 #define MEM_SIZE 16384
-#endif
 // Common settings
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
 
@@ -94,7 +92,6 @@
 
 #define MEMP_NUM_SYS_TIMEOUT (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 1)
 
-#ifdef MQTT_CERT_INC
 #define LWIP_ALTCP 1
 #define LWIP_ALTCP_TLS 1
 #define LWIP_ALTCP_TLS_MBEDTLS 1
@@ -106,7 +103,6 @@
    RX might stall!" */
 #undef TCP_WND
 #define TCP_WND 16384
-#endif // MQTT_CERT_INC
 
 // This defaults to 4
 #define MQTT_REQ_MAX_IN_FLIGHT 5
