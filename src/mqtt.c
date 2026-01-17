@@ -13,6 +13,8 @@
 #include "include/utils.h"
 #include "include/weather_types.h"
 
+#include "hardware/watchdog.h"
+
 static const char *full_topic(const char *name) {
     static char full_topic[MQTT_TOPIC_LEN];
     snprintf(full_topic, sizeof(full_topic), "stations/%s%s", MQTT_USERNAME, name);
@@ -51,6 +53,7 @@ static void unsub_request_cb(void *arg, err_t err) {
 static void sub_unsub_topics(mqtt_t *state, bool sub) {
     mqtt_request_cb_t cb = sub ? sub_request_cb : unsub_request_cb;
     mqtt_sub_unsub(state->mqttClientInst, full_topic("/ping"), MQTT_SUBSCRIBE_QOS, cb, state, sub);
+    mqtt_sub_unsub(state->mqttClientInst, full_topic("/reboot"), MQTT_SUBSCRIBE_QOS, cb, state, sub);
 }
 
 static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags) {
@@ -69,6 +72,10 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
         snprintf(buf, sizeof(buf), "%lu", to_ms_since_boot(get_absolute_time()) / 1000);
         mqtt_publish(state->mqttClientInst, full_topic("/uptime"), buf, strlen(buf),
                      MQTT_PUBLISH_QOS, MQTT_PUBLISH_RETAIN, pub_request_cb, state);
+    }
+    else if (strcmp(basicTopic, "/reboot") == 0) {
+        watchdog_enable(1, false);
+        while (1);
     }
 }
 
