@@ -557,11 +557,9 @@ int main(void) {
 
     psa_crypto_init();
 
-// #ifdef NDEBUG
-//     watchdog_enable(WATCHDOG_INTERVAL_MS, true);
-// #else
-//     watchdog_enable(WATCHDOG_INTERVAL_MS, false);
-// #endif
+#ifdef NDEBUG
+    watchdog_enable(WATCHDOG_INTERVAL_MS, false);
+#endif
 
     weatherAverage_t weatherAverage = {0};
     weatherFinal_t weatherFinal = {0};
