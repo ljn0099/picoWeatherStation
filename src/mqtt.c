@@ -56,7 +56,7 @@ static void sub_unsub_topics(mqtt_t *state, bool sub) {
 static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags) {
     mqtt_t *state = (mqtt_t *)arg;
 
-    const char *basic_topic = state->topic + (sizeof(MQTT_USERNAME) - 1);
+    const char *basicTopic = state->topic + strlen("stations/") + sizeof(MQTT_USERNAME) - 1;
 
     strncpy(state->data, (const char *)data, len);
     state->len = len;
@@ -64,7 +64,7 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
 
     DEBUG_printf("Topic: %s, Message: %s\n", state->topic, state->data);
 
-    if (strcmp(basic_topic, "/ping") == 0) {
+    if (strcmp(basicTopic, "/ping") == 0) {
         char buf[11];
         snprintf(buf, sizeof(buf), "%lu", to_ms_since_boot(get_absolute_time()) / 1000);
         mqtt_publish(state->mqttClientInst, full_topic("/uptime"), buf, strlen(buf),
@@ -230,7 +230,7 @@ static mqtt_t *mqtt_init() {
     state->mqttClientInfo.client_user = MQTT_USERNAME;
     state->mqttClientInfo.client_pass = MQTT_PASSWORD;
 
-    snprintf(state->willTopic, sizeof(state->willTopic), "%s%s", MQTT_USERNAME, MQTT_WILL_TOPIC);
+    strncpy(state->willTopic, full_topic(MQTT_WILL_TOPIC), sizeof(state->willTopic));
     state->mqttClientInfo.will_topic = state->willTopic;
     state->mqttClientInfo.will_msg = MQTT_WILL_MSG;
     state->mqttClientInfo.will_qos = MQTT_WILL_QOS;
