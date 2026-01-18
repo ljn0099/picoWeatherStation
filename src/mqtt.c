@@ -57,6 +57,7 @@ static void sub_unsub_topics(mqtt_t *state, bool sub) {
 }
 
 static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags) {
+    (void)flags;
     mqtt_t *state = (mqtt_t *)arg;
 
     const char *basicTopic = state->topic + strlen("stations/") + sizeof(MQTT_USERNAME) - 1;
@@ -80,11 +81,13 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
 }
 
 static void mqtt_incoming_publish_cb(void *arg, const char *topic, uint32_t totLen) {
+    (void)totLen;
     mqtt_t *state = (mqtt_t *)arg;
     strncpy(state->topic, topic, sizeof(state->topic));
 }
 
 static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection_status_t status) {
+    (void)client;
     mqtt_t *state = (mqtt_t *)arg;
     if (status == MQTT_CONNECT_ACCEPTED) {
         state->connectDone = true;
@@ -128,6 +131,7 @@ static void mqtt_start_client(mqtt_t *state) {
 }
 
 static void mqtt_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
+    (void)hostname;
     mqtt_t *state = (mqtt_t *)arg;
     if (ipaddr) {
         state->mqttServerAddress = *ipaddr;
@@ -256,7 +260,7 @@ void mqtt_start(void) {
     char uniqueIdBuf[UNIQUE_ID_HEX_LEN];
 
     pico_get_unique_board_id_string(uniqueIdBuf, sizeof(uniqueIdBuf));
-    for (int i = 0; i < sizeof(uniqueIdBuf) - 1; i++) {
+    for (size_t i = 0; i < sizeof(uniqueIdBuf) - 1; i++) {
         uniqueIdBuf[i] = tolower(uniqueIdBuf[i]);
     }
 
