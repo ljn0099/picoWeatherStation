@@ -102,6 +102,7 @@ static void ntp_request(ntp_t *state) {
 }
 
 static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
+    (void)hostname;
     ntp_t *state = (ntp_t *)arg;
     if (ipaddr) {
         state->ntpServerAddress = *ipaddr;
@@ -207,6 +208,7 @@ int64_t ntp_calculate_rtt(const struct timespec *t0, const struct timespec *t1,
 
 static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
                      uint16_t port) {
+    (void)pcb;
     ntp_t *state = (ntp_t *)arg;
 
     struct timespec t3;
