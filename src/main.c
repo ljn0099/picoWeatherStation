@@ -548,7 +548,7 @@ void add_new_alarm() {
     }
 }
 
-bool timeSyncedBoot = false;
+volatile bool timeSyncedBoot = false;
 
 int main(void) {
     stdio_init_all();
