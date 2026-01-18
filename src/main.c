@@ -260,6 +260,7 @@ bool compute_callback(__unused struct repeating_timer *t) {
 }
 
 void gpio_callback(uint gpio, uint32_t events) {
+    (void)events;
     if (gpio == RAIN_GAUGE_PIN) {
         weatherIrq.rainfall.interrupts++;
         DEBUG_printf("Interrupt %ld on rain gauge\n", weatherIrq.rainfall.interrupts);
@@ -363,6 +364,8 @@ bool ltr390_init(ltr390_t *ltr390) {
         ERROR_printf("Error enabling ltr390\n");
         return false;
     }
+
+    return true;
 }
 
 bool pcf8523_init(pcf8523_t *pcf8523) {
@@ -543,7 +546,7 @@ void add_new_alarm() {
     aon_timer_alarm_handler_t oldCb;
 
     oldCb = aon_timer_enable_alarm(&localTime, my_alarm_handler, true);
-    if ((uintptr_t)oldCb == PICO_ERROR_INVALID_ARG) {
+    if ((intptr_t)oldCb == PICO_ERROR_INVALID_ARG) {
         panic("Error setting alarm timer");
     }
 }
@@ -551,6 +554,7 @@ void add_new_alarm() {
 volatile bool timeSyncedBoot = false;
 
 int main(void) {
+    watchdog_disable();
     stdio_init_all();
 
     DEBUG_printf("Hello :)\n");
@@ -698,7 +702,7 @@ int main(void) {
     // Main loop
     while (1) {
         process_sample_queue(&weatherAverage, &weatherSensor);
-        process_compute_queue(&weatherAverage, &weatherFinal, &weatherSensor);
+        process_compute_queue(&weatherAverage, &weatherFinal);
         if (queue_try_remove(&timeResultQueue, &timeMsg))
             sync_time(timeMsg, &weatherSensor.pcf8523);
         watchdog_update();
@@ -743,8 +747,7 @@ void process_sample_queue(weatherAverage_t *weatherAverage, weatherSensor_t *wea
     }
 }
 
-void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *weatherFinal,
-                           weatherSensor_t *weatherSensor) {
+void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *weatherFinal) {
     computeCmd_t cmd;
     while (queue_try_remove(&weatherComputeQueue, &cmd)) {
         switch (cmd) {
@@ -820,7 +823,12 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
 }
 
 mbedtls_time_t mbedtls_get_time(mbedtls_time_t *t) {
-    return aon_get_epoch();
+    mbedtls_time_t epochTime = aon_get_epoch();
+
+    if (t)
+        *t = epochTime;
+
+    return epochTime;
 }
 
 mbedtls_ms_time_t mbedtls_ms_time(void) {

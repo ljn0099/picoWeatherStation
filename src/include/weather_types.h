@@ -93,8 +93,7 @@ typedef enum {
     SAMPLE_DPS310,
     SAMPLE_LTR390,
     SAMPLE_PEAK_WIND,
-    SAMPLE_WIND_DIRECTION,
-    SAMPLE_PEAK_WIND_DIRECTION
+    SAMPLE_WIND_DIRECTION
 } sampleCmd_t;
 
 typedef enum {

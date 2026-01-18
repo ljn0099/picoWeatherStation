@@ -93,6 +93,13 @@ target_include_directories(picoWeatherStation PRIVATE
     ${MQTT_CERT_PATH}
 )
 
+target_compile_options(picoWeatherStation PRIVATE
+    -Wall
+    -Wextra
+    -Wshadow
+    -Wno-unterminated-string-initialization
+)
+
 # ---------- Libraries ----------
 target_link_libraries(picoWeatherStation
     pico_stdlib
