@@ -107,8 +107,8 @@ static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection
 }
 
 static void mqtt_start_client(mqtt_t *state) {
-    INFO_printf("IP address of this device %s\n", ipaddr_ntoa(&(netif_list->ip_addr)));
-    INFO_printf("Connecting to mqtt server at %s\n", ipaddr_ntoa(&state->mqttServerAddress));
+    DEBUG_printf("IP address of this device %s\n", ipaddr_ntoa(&(netif_list->ip_addr)));
+    DEBUG_printf("Connecting to mqtt server at %s\n", ipaddr_ntoa(&state->mqttServerAddress));
 
     cyw43_arch_lwip_begin();
     if (mqtt_client_connect(state->mqttClientInst, &state->mqttServerAddress, MQTT_SERVER_PORT,
