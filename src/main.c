@@ -377,6 +377,10 @@ bool pcf8523_init(pcf8523_t *pcf8523) {
         ERROR_printf("Error resetting pcf8523\n");
         return false;
     }
+    if (!pcf8523_set_power_mode(pcf8523, PCF8523_PWR_SWITCH_OVER_STANDARD_LOW_DETECT_ENABLED)) {
+        ERROR_printf("Error setting the power mode for the pcf8523\n");
+        return false;
+    }
     // Wait to oscilator to stabilize
     sleep_ms(2000);
     if (!pcf8523_clear_os_integrity_flag(pcf8523)) {
@@ -813,6 +817,7 @@ void process_compute_queue(weatherAverage_t *weatherAverage, weatherFinal_t *wea
         case COMPUTE_SEND_DATA:
             if (!queue_try_add(&weatherFinalQueue, weatherFinal))
                 DEBUG_printf("Final weather queue full\n");
+
             *weatherFinal = (weatherFinal_t){0};
             break;
         case COMPUTE_TIME_SEND_REQ:
